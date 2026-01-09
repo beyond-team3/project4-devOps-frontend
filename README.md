@@ -1,9 +1,9 @@
-## 📝 Commit Convention
+## Commit Convention
 
-### 📌 기본 형식
+### 기본 형식
 type(scope): subject
 
-### 🔖 Types
+### Types
 - `feat` : 새로운 기능 추가
 - `fix` : 버그 수정
 - `refactor` : 기능 변화 없는 코드 구조 개선
@@ -12,9 +12,8 @@ type(scope): subject
 - `design` : CSS 등 UI/디자인 변경
 - `chore` : 빌드/설정/기타 작업
 
-### 🧭 Scope
+### Scope
 - 변경된 **기능 또는 모듈명**
-- 가능하면 필수
 
 #### 예시
 - user
@@ -22,11 +21,11 @@ type(scope): subject
 - transaction
 - goal
 
-### ✍ Subject
+### Subject
 - 변경 내용을 **간결하고 명확하게** 작성
 - 마침표 사용 ❌
 
-### ✅ Commit Examples
+### Commit 예시
 - feat(login): jwt 인증 로직 추가
 - fix(review): null pointer 예외 처리
 - refactor(payment): 검증 로직 분리
