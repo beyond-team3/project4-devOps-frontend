@@ -7,6 +7,7 @@ import { toast } from 'vue-sonner'
 const router = useRouter()
 const store = useAppStore()
 
+const loginId = ref('')
 const email = ref('')
 const verificationCode = ref('')
 const newPassword = ref('')
@@ -15,11 +16,15 @@ const step = ref(1)
 
 const handleSubmit = async () => {
   if (step.value === 1) {
+    if (!loginId.value) {
+      toast.error('아이디를 입력해주세요.')
+      return
+    }
     if (!email.value) {
       toast.error('이메일을 입력해주세요.')
       return
     }
-    const success = await store.requestPasswordReset(email.value)
+    const success = await store.requestPasswordReset(loginId.value, email.value)
     if (success) {
       toast.success('인증 코드가 이메일로 전송되었습니다.')
       step.value = 2
@@ -45,7 +50,7 @@ const handleSubmit = async () => {
     }
 
     const success = await store.confirmPasswordReset(
-      email.value,
+      loginId.value,
       verificationCode.value,
       newPassword.value
     )
@@ -60,7 +65,7 @@ const handleSubmit = async () => {
 }
 
 const getDescription = () => {
-  if (step.value === 1) return '이메일로 인증 코드를 받으세요'
+  if (step.value === 1) return '아이디와 이메일을 입력하세요'
   if (step.value === 2) return '이메일로 전송된 코드를 입력하세요'
   return '새로운 비밀번호를 입력하세요'
 }
@@ -82,16 +87,29 @@ const getButtonText = () => {
       </div>
       <div class="card-content">
         <form @submit.prevent="handleSubmit" class="space-y-4">
-          <div v-if="step === 1" class="space-y-2">
-            <label for="email" class="label">이메일</label>
-            <input
-              id="email"
-              type="email"
-              v-model="email"
-              required
-              class="input"
-              :disabled="store.loading"
-            />
+          <div v-if="step === 1" class="space-y-4">
+            <div class="space-y-2">
+              <label for="loginId" class="label">아이디</label>
+              <input
+                id="loginId"
+                type="text"
+                v-model="loginId"
+                required
+                class="input"
+                :disabled="store.loading"
+              />
+            </div>
+            <div class="space-y-2">
+              <label for="email" class="label">이메일</label>
+              <input
+                id="email"
+                type="email"
+                v-model="email"
+                required
+                class="input"
+                :disabled="store.loading"
+              />
+            </div>
           </div>
 
           <div v-if="step === 2" class="space-y-2">

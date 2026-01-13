@@ -15,6 +15,9 @@ const verificationCode = ref('')
 const nickname = ref('')
 const isEmailVerified = ref(false)
 const isCodeSent = ref(false)
+const isEmailSending = ref(false)
+const isCodeVerifying = ref(false)
+const isSigningUp = ref(false)
 
 const handleSendVerification = async () => {
   if (!email.value) {
@@ -22,7 +25,10 @@ const handleSendVerification = async () => {
     return
   }
 
+  isEmailSending.value = true
   const success = await store.requestEmailVerification(email.value)
+  isEmailSending.value = false
+
   if (success) {
     isCodeSent.value = true
     toast.success('인증 코드가 이메일로 전송되었습니다.')
@@ -37,7 +43,10 @@ const handleVerifyEmail = async () => {
     return
   }
 
+  isCodeVerifying.value = true
   const success = await store.confirmEmailVerification(email.value, verificationCode.value)
+  isCodeVerifying.value = false
+
   if (success) {
     isEmailVerified.value = true
     toast.success('이메일이 인증되었습니다.')
@@ -62,7 +71,10 @@ const handleSubmit = async () => {
     return
   }
 
+  isSigningUp.value = true
   const success = await store.signup(loginId.value, password.value, email.value, nickname.value)
+  isSigningUp.value = false
+
   if (success) {
     toast.success('회원가입이 완료되었습니다!')
     router.push('/dashboard')
@@ -131,15 +143,19 @@ const handleSubmit = async () => {
                 v-model="email"
                 required
                 class="input flex-1"
-                :disabled="isEmailVerified || store.loading"
+                :disabled="isEmailVerified || isEmailSending"
               />
               <button
                 type="button"
                 @click="handleSendVerification"
-                :disabled="isEmailVerified || !email || store.loading"
-                class="btn btn-primary"
+                :disabled="isEmailVerified || !email || isEmailSending"
+                class="btn btn-primary flex items-center gap-2"
               >
-                {{ store.loading ? '전송중...' : '인증' }}
+                <svg v-if="isEmailSending" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {{ isEmailSending ? '전송중' : '인증' }}
               </button>
             </div>
           </div>
@@ -152,15 +168,19 @@ const handleSubmit = async () => {
                 type="text"
                 v-model="verificationCode"
                 class="input flex-1"
-                :disabled="store.loading"
+                :disabled="isCodeVerifying"
               />
               <button
                 type="button"
                 @click="handleVerifyEmail"
-                :disabled="!verificationCode || store.loading"
-                class="btn btn-primary"
+                :disabled="!verificationCode || isCodeVerifying"
+                class="btn btn-primary flex items-center gap-2"
               >
-                {{ store.loading ? '확인중...' : '확인' }}
+                <svg v-if="isCodeVerifying" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {{ isCodeVerifying ? '확인중' : '확인' }}
               </button>
             </div>
           </div>
@@ -185,10 +205,14 @@ const handleSubmit = async () => {
 
           <button
             type="submit"
-            class="btn btn-primary w-full"
-            :disabled="!isEmailVerified || store.loading"
+            class="btn btn-primary w-full flex items-center justify-center gap-2"
+            :disabled="!isEmailVerified || isSigningUp"
           >
-            {{ store.loading ? '가입 중...' : '회원가입' }}
+            <svg v-if="isSigningUp" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            {{ isSigningUp ? '가입 중...' : '회원가입' }}
           </button>
         </form>
 
