@@ -1,89 +1,114 @@
 <script setup>
 import { ref, watch } from 'vue'
 
-/**
- * props
- * - periodType: 'day' | 'week' | 'month'
- */
-const props = defineProps({
-  periodType: {
-    type: String,
-    default: 'month'
-  }
-})
-
 const emit = defineEmits(['change'])
 
-const selectedType = ref(props.periodType)
-const startDate = ref('')
+/* =====================
+   state
+===================== */
+const periodType = ref('MONTH') // DAY | WEEK | MONTH
+const startDate = ref('') // 문자열 'YYYY-MM-DD'
 const endDate = ref('')
 
-/**
- * 기본값: 이번 달
- */
-const setDefaultMonth = () => {
-  const now = new Date()
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+/* =====================
+   utils
+===================== */
+const today = new Date()
 
-  startDate.value = firstDay.toISOString().slice(0, 10)
-  endDate.value = lastDay.toISOString().slice(0, 10)
+const formatDate = (d) => d.toISOString().slice(0, 10)
+
+const setThisMonth = () => {
+  startDate.value = formatDate(new Date(today.getFullYear(), today.getMonth(), 1))
+  endDate.value = formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 0))
 }
 
-/**
- * 기간 타입 변경 시
- */
-const onChangeType = (type) => {
-  selectedType.value = type
+const setThisWeek = () => {
+  const day = today.getDay() || 7
+  const start = new Date(today)
+  start.setDate(today.getDate() - day + 1)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
 
-  if (type === 'month') {
-    setDefaultMonth()
-  }
-
-  emitChange()
+  startDate.value = formatDate(start)
+  endDate.value = formatDate(end)
 }
 
-/**
- * 부모로 emit
- */
-const emitChange = () => {
+const setToday = () => {
+  const d = formatDate(today)
+  startDate.value = d
+  endDate.value = d
+}
+
+/* =====================
+   handlers
+===================== */
+const applyPeriod = () => {
+  if (!startDate.value || !endDate.value) return
   emit('change', {
-    type: selectedType.value,
-    startDate: startDate.value ? new Date(startDate.value) : null,
-    endDate: endDate.value ? new Date(endDate.value) : null
+    startDate: new Date(startDate.value),
+    endDate: new Date(endDate.value),
   })
 }
 
-/**
- * 최초 진입 시
- */
-setDefaultMonth()
-emitChange()
+const changePeriodType = (type) => {
+  periodType.value = type
 
-watch([startDate, endDate], () => {
-  emitChange()
+  if (type === 'MONTH') setThisMonth()
+  if (type === 'WEEK') setThisWeek()
+  if (type === 'DAY') setToday()
+
+  applyPeriod()
+}
+
+const onDateInputChange = () => {
+  // input에서 수동 변경 시 바로 emit
+  applyPeriod()
+}
+
+/* =====================
+   init
+===================== */
+changePeriodType('MONTH')
+
+/* =====================
+   watch (기간 버튼 외 수동 입력 대응)
+===================== */
+watch([startDate, endDate], ([s, e], [oldS, oldE]) => {
+  if ((s !== oldS || e !== oldE) && s && e) {
+    applyPeriod()
+  }
 })
 </script>
 
 <template>
   <div class="period-selector">
-    <!-- 기간 타입 선택 -->
-    <div class="type-buttons">
+    <!-- 기간 버튼 -->
+    <div class="buttons">
       <button
-          v-for="type in ['day', 'week', 'month']"
-          :key="type"
-          :class="{ active: selectedType === type }"
-          @click="onChangeType(type)"
+          :class="{ active: periodType === 'DAY' }"
+          @click="changePeriodType('DAY')"
       >
-        {{ type === 'day' ? '일별' : type === 'week' ? '주별' : '월별' }}
+        일별
+      </button>
+      <button
+          :class="{ active: periodType === 'WEEK' }"
+          @click="changePeriodType('WEEK')"
+      >
+        주별
+      </button>
+      <button
+          :class="{ active: periodType === 'MONTH' }"
+          @click="changePeriodType('MONTH')"
+      >
+        월별
       </button>
     </div>
 
-    <!-- 날짜 선택 -->
-    <div class="date-picker">
-      <input type="date" v-model="startDate" />
+    <!-- 기간 직접 선택 -->
+    <div class="dates">
+      <input type="date" v-model="startDate" @change="onDateInputChange" />
       <span>~</span>
-      <input type="date" v-model="endDate" />
+      <input type="date" v-model="endDate" @change="onDateInputChange" />
     </div>
   </div>
 </template>
@@ -91,37 +116,37 @@ watch([startDate, endDate], () => {
 <style scoped>
 .period-selector {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  align-items: center;
+  margin-bottom: 16px;
 }
 
-.type-buttons {
+.buttons {
   display: flex;
   gap: 8px;
 }
 
-.type-buttons button {
-  padding: 8px 14px;
+button {
+  padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid #ddd;
-  background: #f9f9f9;
+  border: 1px solid #e5e7eb;
+  background: #fff;
   cursor: pointer;
 }
 
-.type-buttons button.active {
-  background: #4f46e5;
-  color: white;
-  border-color: #4f46e5;
+button.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
 }
 
-.date-picker {
+.dates {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+input[type='date'] {
+  padding: 4px 6px;
 }
 </style>

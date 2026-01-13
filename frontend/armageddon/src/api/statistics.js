@@ -1,23 +1,23 @@
-import axios from 'axios'
+import { apiRequest } from './client'
 
-const api = axios.create({
-    baseURL: '/api',
-})
-
-// 토큰 인터셉터
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('accessToken')
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-})
-
-export function fetchSummaryStatistics(params) {
-    return api.get('/statistics/summary', {
+export const fetchSummaryStatistics = (params) => {
+    return apiRequest('/api/statistics/summary', {
+        method: 'GET',
         params,
-        headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
+    })
+}
+
+
+export const fetchTopExpenses = (params) => {
+    return apiRequest('/api/statistics/expense/top', {
+        method: 'GET',
+        params,
+    })
+}
+
+export const fetchCategoryExpenseStatistics = (params) => {
+    return apiRequest('/api/statistics/expense/categories', {
+        method: 'GET',
+        params,
     })
 }

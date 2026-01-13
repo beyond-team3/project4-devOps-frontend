@@ -1,14 +1,22 @@
 <script setup>
-import { ref } from 'vue'
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
+
 import PeriodSelector from '@/components/stat/PeriodSelector.vue'
 import SummaryCards from '@/components/stat/SummaryCards.vue'
-import { fetchSummaryStatistics } from '@/api/statistics'
-const loading = ref(false)
+import TopExpenseList from '@/components/stat/TopExpenseList.vue'
+import CategoryDonutChart from '@/components/stat/CategoryDonutChart.vue'
 
-onMounted(() => {
-  onPeriodChange({ startDate: null, endDate: null })
-})
+import {
+  fetchSummaryStatistics,
+  fetchTopExpenses,
+  fetchCategoryExpenseStatistics,
+} from '@/api/statistics'
+
+/* =====================
+   state
+===================== */
+const loading = ref(false)
+const error = ref(null)
 
 const summaryData = ref({
   totalIncome: 0,
@@ -17,9 +25,19 @@ const summaryData = ref({
   avgExpense: 0,
 })
 
+const topExpenses = ref([])
+const categoryExpenses = ref([])
 
-const error = ref(null)
+/* =====================
+   lifecycle
+===================== */
+onMounted(() => {
+  onPeriodChange({ startDate: null, endDate: null })
+})
 
+/* =====================
+   functions
+===================== */
 const onPeriodChange = async ({ startDate, endDate }) => {
   loading.value = true
   error.value = null
@@ -29,22 +47,36 @@ const onPeriodChange = async ({ startDate, endDate }) => {
     if (startDate) params.startDate = startDate.toISOString().slice(0, 10)
     if (endDate) params.endDate = endDate.toISOString().slice(0, 10)
 
-    const { data } = await fetchSummaryStatistics(params)
-
+    // 1️⃣ 요약 통계
+    const summaryRes = await fetchSummaryStatistics(params)
     summaryData.value = {
-      totalIncome: data?.totalIncome ?? 0,
-      totalExpense: data?.totalExpense ?? 0,
-      netProfit: data?.netProfit ?? 0,
-      avgExpense: data?.averageExpense ?? 0,
+      totalIncome: summaryRes.totalIncome,
+      totalExpense: summaryRes.totalExpense,
+      netProfit: summaryRes.netProfit,
+      avgExpense: summaryRes.averageExpense,
     }
+
+    // 2️⃣ 상위 지출
+    const topRes = await fetchTopExpenses(params)
+    topExpenses.value = topRes
+
+    // 3️⃣ 카테고리별 도넛
+    const categoryRes = await fetchCategoryExpenseStatistics(params)
+    categoryExpenses.value = categoryRes
+
+    console.log('🔥 summary:', summaryRes)
+    console.log('🔥 top expenses:', topRes)
+    console.log('🔥 category expenses:', categoryRes)
   } catch (e) {
     console.error(e)
-    error.value = '요약 통계를 불러오지 못했습니다.'
+    error.value = '통계 데이터를 불러오지 못했습니다.'
   } finally {
     loading.value = false
   }
 }
+
 </script>
+
 
 <template>
   <PeriodSelector @change="onPeriodChange" />
@@ -52,14 +84,29 @@ const onPeriodChange = async ({ startDate, endDate }) => {
   <div v-if="loading">로딩중...</div>
   <div v-else-if="error">{{ error }}</div>
 
-  <SummaryCards
-      v-else
-      :totalIncome="summaryData.totalIncome"
-      :totalExpense="summaryData.totalExpense"
-      :netProfit="summaryData.netProfit"
-      :avgExpense="summaryData.avgExpense"
-  />
+  <template v-else>
+    <SummaryCards
+        :totalIncome="summaryData.totalIncome"
+        :totalExpense="summaryData.totalExpense"
+        :netProfit="summaryData.netProfit"
+        :avgExpense="summaryData.avgExpense"
+    />
+
+    <div class="grid">
+      <TopExpenseList :expenses="topExpenses" />
+      <CategoryDonutChart :data="categoryExpenses" />
+    </div>
+  </template>
 </template>
+
+<style scoped>
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+</style>
+
 
 <style scoped>
 </style>
