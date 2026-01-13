@@ -127,6 +127,53 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  // 사용자 정보 조회
+  const fetchUserInfo = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await userApi.getMe()
+      if (response.result === 'SUCCESS' && response.data) {
+        user.value = {
+          ...user.value,
+          id: response.data.id,
+          loginId: response.data.loginId,
+          email: response.data.email,
+          nickname: response.data.nickname
+        }
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 사용자 정보 수정
+  const updateUserProfile = async ({ loginId, email, nickname, currentPassword }) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await userApi.updateUser({ loginId, email, nickname, currentPassword })
+      if (response.result === 'SUCCESS') {
+        // 성공 시 사용자 정보 업데이트
+        if (loginId) user.value.loginId = loginId
+        if (email) user.value.email = email
+        if (nickname) user.value.nickname = nickname
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 이메일 인증 요청
   const requestEmailVerification = async (email) => {
     loading.value = true
@@ -158,11 +205,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // 비밀번호 재설정 요청
-  const requestPasswordReset = async (email) => {
+  const requestPasswordReset = async (loginId, email) => {
     loading.value = true
     error.value = null
     try {
-      const response = await authApi.requestPasswordReset(email)
+      const response = await authApi.requestPasswordReset(loginId, email)
       return response.result === 'SUCCESS'
     } catch (err) {
       error.value = err.message
@@ -173,11 +220,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // 비밀번호 재설정 확인
-  const confirmPasswordReset = async (email, code, newPassword) => {
+  const confirmPasswordReset = async (loginId, code, newPassword) => {
     loading.value = true
     error.value = null
     try {
-      const response = await authApi.confirmPasswordReset(email, code, newPassword)
+      const response = await authApi.confirmPasswordReset(loginId, code, newPassword)
       return response.result === 'SUCCESS'
     } catch (err) {
       error.value = err.message
@@ -272,6 +319,47 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  // 거래 목록 조회 (기간)
+  const fetchTransactions = async (year, month) => {
+    loading.value = true
+    error.value = null
+    try {
+      // 해당 월의 시작일과 마지막일 계산
+      const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month + 1, 0).getDate()
+      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`
+
+      const response = await transactionApi.getTransactions(startDate, endDate)
+
+      if (response.result === 'SUCCESS') {
+        // 가져온 데이터로 transactions 상태 업데이트
+        // 주의: 현재는 단순히 해당 월 데이터만 보여주는 것이 아니라 전체 누적이 필요한지 확인 필요.
+        // 하지만 MainDashboard가 현재 store.transactions에 의존하므로, 
+        // 일단 서버에서 받은 데이터가 최신이므로 이를 로컬 상태에 병합하거나 교체해야 함.
+        // 여기서는 해당 월 데이터만 보여주는 시나리오가 아니라면 전체 리스트 관리가 복잡할 수 있음.
+        // 우선순위: 서버 데이터 > 로컬 데이터
+        // 간단한 구현: 받은 데이터로 기존 해당 월 데이터를 교체.
+
+        const newTransactions = response.data
+
+        // 기존 transactions에서 해당 기간 외의 데이터는 유지하고, 해당 기간 데이터는 제거 후 새 데이터 추가
+        const existingOthers = transactions.value.filter(t => {
+          const tDate = new Date(t.date)
+          return tDate < new Date(startDate) || tDate > new Date(endDate)
+        })
+
+        transactions.value = [...existingOthers, ...newTransactions]
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   // ============ Goal Actions (로컬 저장소만 사용) ============
 
   const addGoal = async (goal) => {
@@ -310,6 +398,8 @@ export const useAppStore = defineStore('app', () => {
     signup,
     logout,
     deleteAccount,
+    fetchUserInfo,
+    updateUserProfile,
     requestEmailVerification,
     confirmEmailVerification,
     requestPasswordReset,
@@ -318,6 +408,7 @@ export const useAppStore = defineStore('app', () => {
     addTransaction,
     updateTransaction,
     deleteTransaction: deleteTransactionById,
+    fetchTransactions,
     // Goal actions
     fetchGoals,
     addGoal,

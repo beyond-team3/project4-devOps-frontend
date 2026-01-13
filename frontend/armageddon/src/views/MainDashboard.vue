@@ -1,11 +1,14 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet } from 'lucide-vue-next'
+import TransactionModal from '../components/TransactionModal.vue'
 
 const store = useAppStore()
 const currentDate = ref(new Date())
 const selectedDate = ref(null)
+const selectedTransaction = ref(null) // For editing direct from recent list
+const isModalOpen = ref(false)
 
 const totals = computed(() => {
   const income = store.transactions
@@ -23,7 +26,7 @@ const totals = computed(() => {
 
 const recentTransactions = computed(() => {
   return [...store.transactions]
-    .sort((a, b) => b.createdAt - a.createdAt)
+    .sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id) // 날짜 내림차순 정렬 강화
     .slice(0, 5)
 })
 
@@ -65,19 +68,31 @@ const getDateString = (day) => {
   return `${year.value}-${String(month.value + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+const loadMonthlyData = async () => {
+  await store.fetchTransactions(year.value, month.value)
+}
+
 const prevMonth = () => {
   currentDate.value = new Date(year.value, month.value - 1, 1)
+  loadMonthlyData()
 }
 
 const nextMonth = () => {
   currentDate.value = new Date(year.value, month.value + 1, 1)
+  loadMonthlyData()
 }
 
 const handleDayClick = (dateStr) => {
-  const { income, expense } = getDayTotals(dateStr)
-  if (income > 0 || expense > 0) {
-    selectedDate.value = dateStr
-  }
+  selectedDate.value = dateStr
+  selectedTransaction.value = null
+  isModalOpen.value = true
+}
+
+// 최근 내역에서 클릭 시
+const handleTransactionClick = (txn) => {
+  selectedDate.value = txn.date
+  selectedTransaction.value = txn
+  isModalOpen.value = true
 }
 
 const selectedDayTransactions = computed(() => {
@@ -85,8 +100,14 @@ const selectedDayTransactions = computed(() => {
 })
 
 const closeModal = () => {
+  isModalOpen.value = false
   selectedDate.value = null
+  selectedTransaction.value = null
 }
+
+onMounted(() => {
+  loadMonthlyData() // 초기 데이터 로드
+})
 </script>
 
 <template>
@@ -171,14 +192,12 @@ const closeModal = () => {
               v-for="day in calendarData.daysInMonth"
               :key="day"
               @click="handleDayClick(getDateString(day))"
-              :class="[
-                'aspect-square rounded-lg p-1 flex flex-col items-center justify-start transition-all',
-                getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0
-                  ? 'cursor-pointer hover:shadow-md hover:scale-105 bg-white'
-                  : 'cursor-default bg-gray-50'
-              ]"
+              class="aspect-square rounded-lg p-1 flex flex-col items-center justify-start transition-all cursor-pointer hover:shadow-md hover:scale-105 bg-white border border-transparent hover:border-blue-200"
+              :class="{
+                'bg-blue-50/50': getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0
+              }"
               :style="{
-                border: (getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0) ? '1px solid #DBE3E9' : 'none'
+                border: (getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0) ? '1px solid #DBE3E9' : ''
               }"
             >
               <div class="text-sm" style="color: #000000">{{ day }}</div>
@@ -218,14 +237,15 @@ const closeModal = () => {
               v-else
               v-for="txn in recentTransactions"
               :key="txn.id"
-              class="flex items-center justify-between py-2 border-b"
+              @click="handleTransactionClick(txn)"
+              class="flex items-center justify-between py-2 border-b cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors"
             >
-              <div class="flex-1">
-                <div class="text-sm">{{ txn.title }}</div>
+              <div class="flex-1 min-w-0 pr-2">
+                <div class="text-sm font-medium truncate">{{ txn.title }}</div>
                 <div class="text-xs text-muted-foreground">{{ txn.date }}</div>
               </div>
               <div
-                class="text-sm"
+                class="text-sm whitespace-nowrap"
                 :style="{ color: txn.type === 'expense' ? '#ED1C24' : '#22B14C' }"
               >
                 {{ txn.type === 'expense' ? '-' : '+' }}{{ txn.amount.toLocaleString() }}원
@@ -236,35 +256,13 @@ const closeModal = () => {
       </div>
     </div>
 
-    <!-- Daily Transaction Modal -->
-    <div
-      v-if="selectedDate"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      @click.self="closeModal"
-    >
-      <div class="bg-white rounded-lg p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
-        <h3 class="text-lg font-semibold mb-4">{{ selectedDate }} 거래 내역</h3>
-        <div class="space-y-3">
-          <div
-            v-for="txn in selectedDayTransactions"
-            :key="txn.id"
-            class="flex items-center justify-between py-2 border-b"
-          >
-            <div class="flex-1">
-              <div>{{ txn.title }}</div>
-              <div v-if="txn.category" class="text-sm text-muted-foreground">
-                {{ txn.category }}
-              </div>
-            </div>
-            <div :style="{ color: txn.type === 'expense' ? '#ED1C24' : '#22B14C' }">
-              {{ txn.type === 'expense' ? '-' : '+' }}{{ txn.amount.toLocaleString() }}원
-            </div>
-          </div>
-        </div>
-        <button @click="closeModal" class="btn btn-primary w-full mt-4">
-          닫기
-        </button>
-      </div>
-    </div>
+    <!-- Transaction Modal -->
+    <TransactionModal
+      :is-open="isModalOpen"
+      :selected-date="selectedDate"
+      :initial-transactions="selectedDayTransactions"
+      :initial-edit-data="selectedTransaction"
+      @close="closeModal"
+    />
   </div>
 </template>

@@ -81,6 +81,28 @@ export const deleteTransaction = async (transactionId) => {
   return response
 }
 
+// 거래 조회 (기간별)
+export const getTransactions = async (startDate, endDate) => {
+  // 쿼리 파라미터 생성
+  const queryParams = new URLSearchParams({
+    startDate,
+    endDate
+  }).toString()
+
+  const response = await apiRequest(`/transaction/list?${queryParams}`, {
+    method: 'GET'
+  })
+  
+  // 데이터 변환 후 반환
+  if (response.result === 'SUCCESS' && Array.isArray(response.data)) {
+    return {
+      ...response,
+      data: response.data.map(transformTransaction)
+    }
+  }
+  return response
+}
+
 // 응답 데이터 변환 (API -> 프론트엔드)
 export const transformTransaction = (apiTransaction) => {
   return {
