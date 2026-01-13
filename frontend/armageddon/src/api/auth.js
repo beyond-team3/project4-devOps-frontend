@@ -62,20 +62,20 @@ export const confirmEmailVerification = async (email, code) => {
 }
 
 // 비밀번호 재설정 요청
-export const requestPasswordReset = async (email) => {
+export const requestPasswordReset = async (loginId, email) => {
   const response = await apiRequest('/api/auth/password/reset/request', {
     method: 'POST',
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ loginId, email }),
     skipAuth: true
   })
   return response
 }
 
 // 비밀번호 재설정 확인
-export const confirmPasswordReset = async (email, code, newPassword) => {
+export const confirmPasswordReset = async (loginId, code, newPassword) => {
   const response = await apiRequest('/api/auth/password/reset/confirm', {
     method: 'POST',
-    body: JSON.stringify({ email, code, newPassword }),
+    body: JSON.stringify({ loginId, code, newPassword }),
     skipAuth: true
   })
   return response
