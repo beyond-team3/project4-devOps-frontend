@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { authApi, userApi, transactionApi, getTokens, clearTokens } from '../api'
+import { authApi, userApi, transactionApi, goalApi, getTokens, clearTokens } from '../api'
 
 const STORAGE_KEY = 'armageddon_data'
 
@@ -13,33 +13,37 @@ export const useAppStore = defineStore('app', () => {
   const error = ref(null)
 
   // Load from localStorage (for goals - 백엔드에 Goal API가 없으므로 로컬 저장)
-  const loadFromStorage = () => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try {
-        const data = JSON.parse(stored)
-        goals.value = data.goals || []
-        // 토큰이 있으면 사용자 정보 복원
-        const tokens = getTokens()
-        if (tokens && data.user) {
-          user.value = data.user
-        }
-      } catch {
-        goals.value = []
-      }
-    }
+  // const loadFromStorage = () => {
+  //   const stored = localStorage.getItem(STORAGE_KEY)
+  //   if (stored) {
+  //     try {
+  //       const data = JSON.parse(stored)
+  //       goals.value = data.goals || []
+  //       // 토큰이 있으면 사용자 정보 복원
+  //       const tokens = getTokens()
+  //       if (tokens && data.user) {
+  //         user.value = data.user
+  //       }
+  //     } catch {
+  //       goals.value = []
+  //     }
+  //   }
+  // }
+  const fetchGoals = async () => {
+    const res = await goalApi.getGoals()
+    goals.value = res.data
   }
 
   // Save to localStorage
-  const saveToStorage = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      user: user.value,
-      goals: goals.value
-    }))
-  }
+  // const saveToStorage = () => {
+  //   localStorage.setItem(STORAGE_KEY, JSON.stringify({
+  //     user: user.value,
+  //     goals: goals.value
+  //   }))
+  // }
 
   // Watch for changes and save
-  watch([user, goals], saveToStorage, { deep: true })
+  // watch([user, goals], saveToStorage, { deep: true })
 
   // ============ Auth Actions ============
 
@@ -58,6 +62,7 @@ export const useAppStore = defineStore('app', () => {
           nickname: loginId,
           createdAt: Date.now()
         }
+        await fetchGoals()
         return true
       }
       return false
@@ -269,31 +274,27 @@ export const useAppStore = defineStore('app', () => {
 
   // ============ Goal Actions (로컬 저장소만 사용) ============
 
-  const addGoal = (goal) => {
-    const newGoal = {
-      ...goal,
-      id: `goal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: Date.now()
-    }
-    goals.value.push(newGoal)
+  const addGoal = async (goal) => {
+    await goalApi.createGoal(goal)
+    await fetchGoals()
   }
 
-  const updateGoal = (id, updates) => {
-    const index = goals.value.findIndex(g => g.id === id)
-    if (index !== -1) {
-      goals.value[index] = { ...goals.value[index], ...updates }
-    }
+  const updateGoal = async (id, updates) => {
+    await goalApi.updateGoal(id, updates)
+    await fetchGoals()
   }
 
-  const deleteGoal = (id) => {
-    goals.value = goals.value.filter(g => g.id !== id)
+  const deleteGoal = async (id) => {
+    await goalApi.deleteGoal(id)
+    await fetchGoals()
   }
+
 
   // ============ Computed ============
   const isAuthenticated = computed(() => !!user.value || !!getTokens())
 
   // ============ Initialize ============
-  loadFromStorage()
+  // loadFromStorage()
 
   return {
     // State
@@ -318,6 +319,7 @@ export const useAppStore = defineStore('app', () => {
     updateTransaction,
     deleteTransaction: deleteTransactionById,
     // Goal actions
+    fetchGoals,
     addGoal,
     updateGoal,
     deleteGoal

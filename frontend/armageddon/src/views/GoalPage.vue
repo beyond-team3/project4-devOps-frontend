@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { Plus, Target, Wallet, Pencil, Trash2, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -139,46 +139,12 @@ const closeDialog = () => {
   selectedGoal.value = null
   resetForm()
 }
+const goalStats = computed(() => store.goals)
 
-const goalStats = computed(() => {
-  return store.goals.map(goal => {
-    if (goal.type === 'savings') {
-      const savedAmount = store.transactions
-        .filter(t => t.type === 'income' && t.date >= goal.startDate && t.date <= goal.endDate)
-        .reduce((sum, t) => sum + t.amount, 0)
-
-      const progress = (savedAmount / goal.targetAmount) * 100
-
-      return {
-        ...goal,
-        currentAmount: savedAmount,
-        progress: Math.min(progress, 100),
-        status: progress >= 100 ? 'achieved' : progress >= 75 ? 'on-track' : 'needs-effort'
-      }
-    } else {
-      const spentAmount = store.transactions
-        .filter(
-          t =>
-            t.type === 'expense' &&
-            t.category === goal.category &&
-            t.date >= goal.startDate &&
-            t.date <= goal.endDate
-        )
-        .reduce((sum, t) => sum + t.amount, 0)
-
-      const usageRate = (spentAmount / goal.budgetLimit) * 100
-      const remaining = goal.budgetLimit - spentAmount
-
-      return {
-        ...goal,
-        spentAmount,
-        usageRate: Math.min(usageRate, 100),
-        remaining,
-        status: usageRate >= 100 ? 'exceeded' : usageRate >= 80 ? 'warning' : 'safe'
-      }
-    }
-  })
+onMounted(() => {
+  store.fetchGoals()
 })
+
 </script>
 
 <template>
@@ -206,7 +172,7 @@ const goalStats = computed(() => {
 
       <div
         v-else
-        v-for="goal in goalStats"
+        v-for="goal in store.goals"
         :key="goal.id"
         class="card shadow-md border-l-4"
         :style="{
@@ -251,13 +217,13 @@ const goalStats = computed(() => {
               <div class="w-full bg-gray-200 rounded h-2">
                 <div
                   class="h-2 rounded"
-                  :style="{ width: `${goal.progress}%`, backgroundColor: '#22B14C' }"
+                  :style="{ width: `${goal.progressRate}%`, backgroundColor: '#22B14C' }"
                 />
               </div>
               <div class="text-sm text-right mt-1">{{ goal.progress.toFixed(0) }}%</div>
             </div>
             <div class="flex items-center gap-2 text-sm">
-              <template v-if="goal.status === 'achieved'">
+              <template v-if="goal.status === 'COMPLETED'">
                 <CheckCircle class="size-4" style="color: #22B14C" />
                 <span style="color: #22B14C">목표 달성!</span>
               </template>
