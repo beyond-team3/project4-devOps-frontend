@@ -122,6 +122,53 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  // 사용자 정보 조회
+  const fetchUserInfo = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await userApi.getMe()
+      if (response.result === 'SUCCESS' && response.data) {
+        user.value = {
+          ...user.value,
+          id: response.data.id,
+          loginId: response.data.loginId,
+          email: response.data.email,
+          nickname: response.data.nickname
+        }
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 사용자 정보 수정
+  const updateUserProfile = async ({ loginId, email, nickname, currentPassword }) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await userApi.updateUser({ loginId, email, nickname, currentPassword })
+      if (response.result === 'SUCCESS') {
+        // 성공 시 사용자 정보 업데이트
+        if (loginId) user.value.loginId = loginId
+        if (email) user.value.email = email
+        if (nickname) user.value.nickname = nickname
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 이메일 인증 요청
   const requestEmailVerification = async (email) => {
     loading.value = true
@@ -153,11 +200,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // 비밀번호 재설정 요청
-  const requestPasswordReset = async (email) => {
+  const requestPasswordReset = async (loginId, email) => {
     loading.value = true
     error.value = null
     try {
-      const response = await authApi.requestPasswordReset(email)
+      const response = await authApi.requestPasswordReset(loginId, email)
       return response.result === 'SUCCESS'
     } catch (err) {
       error.value = err.message
@@ -168,11 +215,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // 비밀번호 재설정 확인
-  const confirmPasswordReset = async (email, code, newPassword) => {
+  const confirmPasswordReset = async (loginId, code, newPassword) => {
     loading.value = true
     error.value = null
     try {
-      const response = await authApi.confirmPasswordReset(email, code, newPassword)
+      const response = await authApi.confirmPasswordReset(loginId, code, newPassword)
       return response.result === 'SUCCESS'
     } catch (err) {
       error.value = err.message
@@ -309,6 +356,8 @@ export const useAppStore = defineStore('app', () => {
     signup,
     logout,
     deleteAccount,
+    fetchUserInfo,
+    updateUserProfile,
     requestEmailVerification,
     confirmEmailVerification,
     requestPasswordReset,
