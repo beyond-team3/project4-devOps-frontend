@@ -32,205 +32,223 @@ export const useAppStore = defineStore('app', () => {
             }
         }
     }
+  // Load from localStorage (for goals - 백엔드에 Goal API가 없으므로 로컬 저장)
+  // const loadFromStorage = () => {
+  //   const stored = localStorage.getItem(STORAGE_KEY)
+  //   if (stored) {
+  //     try {
+  //       const data = JSON.parse(stored)
+  //       goals.value = data.goals || []
+  //       // 토큰이 있으면 사용자 정보 복원
+  //       const tokens = getTokens()
+  //       if (tokens && data.user) {
+  //         user.value = data.user
+  //       }
+  //     } catch {
+  //       goals.value = []
+  //     }
+  //   }
+  // }
 
-    // Save to localStorage
-    const saveToStorage = () => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            user: user.value,
-            goals: goals.value
-        }))
-    }
+  // Save to localStorage
+  // const saveToStorage = () => {
+  //   localStorage.setItem(STORAGE_KEY, JSON.stringify({
+  //     user: user.value,
+  //     goals: goals.value
+  //   }))
+  // }
 
     // Watch for changes and save
-    watch([user, goals], saveToStorage, { deep: true })
+    // watch([user, goals], saveToStorage, { deep: true })
 
     // ============ Auth Actions ============
 
-    // 로그인
-    const login = async (loginId, password) => {
-        loading.value = true
-        error.value = null
-        try {
-            const response = await authApi.login(loginId, password)
-            if (response.result === 'SUCCESS') {
-                // 토큰은 API에서 자동 저장됨
-                // 사용자 정보 설정 (JWT에서 추출하거나 별도 API 호출 필요)
-                user.value = {
-                    loginId,
-                    email: '',
-                    nickname: loginId,
-                    createdAt: Date.now()
-                }
-                return true
-            }
-            return false
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
+  // 로그인
+  const login = async (loginId, password) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await authApi.login(loginId, password)
+      if (response.result === 'SUCCESS') {
+        // 토큰은 API에서 자동 저장됨
+        // 사용자 정보 설정 (JWT에서 추출하거나 별도 API 호출 필요)
+        user.value = {
+          loginId,
+          email: '',
+          nickname: loginId,
+          createdAt: Date.now()
         }
+        await fetchGoals()
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
-    // 회원가입
-    const signup = async (loginId, password, email, nickname) => {
-        loading.value = true
-        error.value = null
-        try {
-            const response = await authApi.signup(loginId, password, email, nickname)
-            if (response.result === 'SUCCESS') {
-                // 회원가입 후 자동 로그인
-                return await login(loginId, password)
-            }
-            return false
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
-        }
+  // 회원가입
+  const signup = async (loginId, password, email, nickname) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await authApi.signup(loginId, password, email, nickname)
+      if (response.result === 'SUCCESS') {
+        // 회원가입 후 자동 로그인
+        return await login(loginId, password)
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
-    // 로그아웃
-    const logout = async () => {
-        loading.value = true
-        try {
-            await authApi.logout()
-        } catch {
-            // 에러 무시
-        } finally {
-            user.value = null
-            transactions.value = []
-            clearTokens()
-            loading.value = false
-        }
+  // 로그아웃
+  const logout = async () => {
+    loading.value = true
+    try {
+      await authApi.logout()
+    } catch {
+      // 에러 무시
+    } finally {
+      user.value = null
+      transactions.value = []
+      clearTokens()
+      loading.value = false
     }
+  }
 
-    // 계정 삭제
-    const deleteAccount = async () => {
-        loading.value = true
-        error.value = null
-        try {
-            await userApi.deleteAccount()
-            user.value = null
-            transactions.value = []
-            goals.value = []
-            clearTokens()
-            return true
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
-        }
+  // 계정 삭제
+  const deleteAccount = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      await userApi.deleteAccount()
+      user.value = null
+      transactions.value = []
+      goals.value = []
+      clearTokens()
+      return true
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
-    // 사용자 정보 조회
-    const fetchUserInfo = async () => {
-        loading.value = true
-        error.value = null
-        try {
-            const response = await userApi.getMe()
-            if (response.result === 'SUCCESS' && response.data) {
-                user.value = {
-                    ...user.value,
-                    id: response.data.id,
-                    loginId: response.data.loginId,
-                    email: response.data.email,
-                    nickname: response.data.nickname
-                }
-                return true
-            }
-            return false
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
+  // 사용자 정보 조회
+  const fetchUserInfo = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await userApi.getMe()
+      if (response.result === 'SUCCESS' && response.data) {
+        user.value = {
+          ...user.value,
+          id: response.data.id,
+          loginId: response.data.loginId,
+          email: response.data.email,
+          nickname: response.data.nickname
         }
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
-    // 사용자 정보 수정
-    const updateUserProfile = async ({ loginId, email, nickname, currentPassword }) => {
-        loading.value = true
-        error.value = null
-        try {
-            const response = await userApi.updateUser({ loginId, email, nickname, currentPassword })
-            if (response.result === 'SUCCESS') {
-                // 성공 시 사용자 정보 업데이트
-                if (loginId) user.value.loginId = loginId
-                if (email) user.value.email = email
-                if (nickname) user.value.nickname = nickname
-                return true
-            }
-            return false
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
-        }
+  // 사용자 정보 수정
+  const updateUserProfile = async ({ loginId, email, nickname, currentPassword }) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await userApi.updateUser({ loginId, email, nickname, currentPassword })
+      if (response.result === 'SUCCESS') {
+        // 성공 시 사용자 정보 업데이트
+        if (loginId) user.value.loginId = loginId
+        if (email) user.value.email = email
+        if (nickname) user.value.nickname = nickname
+        return true
+      }
+      return false
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
-    // 이메일 인증 요청
-    const requestEmailVerification = async (email) => {
-        loading.value = true
-        error.value = null
-        try {
-            const response = await authApi.requestEmailVerification(email)
-            return response.result === 'SUCCESS'
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
-        }
+  // 이메일 인증 요청
+  const requestEmailVerification = async (email) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await authApi.requestEmailVerification(email)
+      return response.result === 'SUCCESS'
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
-    // 이메일 인증 확인
-    const confirmEmailVerification = async (email, code) => {
-        loading.value = true
-        error.value = null
-        try {
-            const response = await authApi.confirmEmailVerification(email, code)
-            return response.result === 'SUCCESS'
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
-        }
+  // 이메일 인증 확인
+  const confirmEmailVerification = async (email, code) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await authApi.confirmEmailVerification(email, code)
+      return response.result === 'SUCCESS'
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
-    // 비밀번호 재설정 요청
-    const requestPasswordReset = async (loginId, email) => {
-        loading.value = true
-        error.value = null
-        try {
-            const response = await authApi.requestPasswordReset(loginId, email)
-            return response.result === 'SUCCESS'
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
-        }
+  // 비밀번호 재설정 요청
+  const requestPasswordReset = async (loginId, email) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await authApi.requestPasswordReset(loginId, email)
+      return response.result === 'SUCCESS'
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
-    // 비밀번호 재설정 확인
-    const confirmPasswordReset = async (loginId, code, newPassword) => {
-        loading.value = true
-        error.value = null
-        try {
-            const response = await authApi.confirmPasswordReset(loginId, code, newPassword)
-            return response.result === 'SUCCESS'
-        } catch (err) {
-            error.value = err.message
-            return false
-        } finally {
-            loading.value = false
-        }
+  // 비밀번호 재설정 확인
+  const confirmPasswordReset = async (loginId, code, newPassword) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await authApi.confirmPasswordReset(loginId, code, newPassword)
+      return response.result === 'SUCCESS'
+    } catch (err) {
+      error.value = err.message
+      return false
+    } finally {
+      loading.value = false
     }
+  }
 
     // ============ Transaction Actions ============
 
@@ -369,68 +387,131 @@ export const useAppStore = defineStore('app', () => {
         return false
     }
 
-    // ============ Goal Actions (로컬 저장소만 사용) ============
+  // ============ Goal Actions ============
 
-    const addGoal = (goal) => {
-        const newGoal = {
-            ...goal,
-            id: `goal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            createdAt: Date.now()
-        }
-        goals.value.push(newGoal)
+  const fetchGoals = async () => {
+    try {
+      loading.value = true
+      const res = await goalApi.getGoals()
+      if (res.result === 'SUCCESS') {
+        goals.value = res.data.map(g => {
+          // Map backend fields to frontend model
+          const type = g.goalType === 'SAVING' ? 'savings' : 'spending'
+          const isSavings = type === 'savings'
+
+          // Calculate derived fields if missing in summary
+          const currentAmount = g.targetAmount * (g.progressRate / 100)
+
+          return {
+            id: g.goalId,
+            type: type,
+            title: g.title,
+            status: mapStatus(g.status), // Helper needed or inline
+            // Savings fields
+            targetAmount: g.targetAmount,
+            currentAmount: currentAmount,
+            progressRate: g.progressRate,
+            progress: g.progressRate, // Frontend uses both?
+            // Spending fields
+            category: g.category || '기타',
+            budgetLimit: g.targetAmount,
+            spentAmount: currentAmount,
+            usageRate: g.progressRate,
+            remaining: g.targetAmount - currentAmount,
+            // Common
+            startDate: g.startDate,
+            endDate: g.endDate,
+            rawStatus: g.status
+          }
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      loading.value = false
     }
+  }
 
-    const updateGoal = (id, updates) => {
-        const index = goals.value.findIndex(g => g.id === id)
-        if (index !== -1) {
-            goals.value[index] = { ...goals.value[index], ...updates }
-        }
+  const fetchGoalDetail = async (id) => {
+    try {
+      const res = await goalApi.getGoalDetail(id)
+      if (res.result === 'SUCCESS') {
+        return res.data
+      }
+    } catch (err) {
+      console.error(err)
     }
+    return null
+  }
 
-    const deleteGoal = (id) => {
-        goals.value = goals.value.filter(g => g.id !== id)
+  const mapStatus = (backendStatus) => {
+    // Backend: COMPLETED, ACTIVE?
+    // Frontend expects: COMPLETED, on-track, warning, exceeded
+    if (backendStatus === 'COMPLETED') return 'COMPLETED'
+    // Default to on-track or simple mapping if generic
+    return 'on-track'
+  }
+
+  const addGoal = async (goal) => {
+    if (goal.type === 'savings') {
+      await goalApi.createSavingGoal(goal)
+    } else {
+      await goalApi.createExpenseGoal(goal)
     }
+    await fetchGoals()
+  }
 
-    // ============ Computed ============
-    const isAuthenticated = computed(() => !!user.value || !!getTokens())
+  const updateGoal = async (id, updates) => {
+    await goalApi.updateGoal(id, updates)
+    await fetchGoals()
+  }
 
-    // ============ Initialize ============
-    loadFromStorage()
+  const deleteGoal = async (id) => {
+    await goalApi.deleteGoal(id)
+    await fetchGoals()
+  }
 
-    return {
-        // State
-        user,
-        transactions,
-        goals,
-        loading,
-        error,
-        monthlySummary,
-        dailyTransactions,
-        selectedDate,
-        // Computed
-        isAuthenticated,
-        // Auth actions
-        login,
-        signup,
-        logout,
-        deleteAccount,
-        fetchUserInfo,
-        updateUserProfile,
-        requestEmailVerification,
-        confirmEmailVerification,
-        requestPasswordReset,
-        confirmPasswordReset,
-        // Transaction actions
-        addTransaction,
-        updateTransaction,
-        deleteTransaction: deleteTransactionById,
-        fetchMonthlyData,
-        fetchDailyTransactions,
-        // Goal actions
-        addGoal,
-        updateGoal,
-        deleteGoal,
-        fetchTransactions
-    }
 
+  // ============ Computed ============
+  const isAuthenticated = computed(() => !!user.value || !!getTokens())
+
+  // ============ Initialize ============
+  // loadFromStorage()
+
+  return {
+    // State
+    user,
+    transactions,
+    goals,
+    loading,
+    error,
+    // Computed
+    isAuthenticated,
+    // Auth actions
+    login,
+    signup,
+    logout,
+    deleteAccount,
+    fetchUserInfo,
+    updateUserProfile,
+    requestEmailVerification,
+    confirmEmailVerification,
+    requestPasswordReset,
+    confirmPasswordReset,
+    // Transaction actions
+      monthlySummary,
+      dailyTransactions,
+      selectedDate,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction: deleteTransactionById,
+      fetchMonthlyData,
+      fetchDailyTransactions,
+    // Goal actions
+    fetchGoals,
+    fetchGoalDetail,
+    addGoal,
+    updateGoal,
+    deleteGoal
+  }
 })
