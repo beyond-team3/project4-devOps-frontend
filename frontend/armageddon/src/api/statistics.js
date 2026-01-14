@@ -21,3 +21,10 @@ export const fetchCategoryExpenseStatistics = (params) => {
         params,
     })
 }
+
+export const fetchExpenseTrend = (params) => {
+    return apiRequest('/api/statistics/expense/trend', {
+        method: 'GET',
+        params,
+    });
+}
