@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { authApi, userApi, transactionApi, getTokens, clearTokens } from '../api'
+import { authApi, userApi, transactionApi, goalApi, getTokens, clearTokens } from '../api'
 
 const STORAGE_KEY = 'armageddon_data'
 
@@ -13,33 +13,34 @@ export const useAppStore = defineStore('app', () => {
   const error = ref(null)
 
   // Load from localStorage (for goals - 백엔드에 Goal API가 없으므로 로컬 저장)
-  const loadFromStorage = () => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try {
-        const data = JSON.parse(stored)
-        goals.value = data.goals || []
-        // 토큰이 있으면 사용자 정보 복원
-        const tokens = getTokens()
-        if (tokens && data.user) {
-          user.value = data.user
-        }
-      } catch {
-        goals.value = []
-      }
-    }
-  }
+  // const loadFromStorage = () => {
+  //   const stored = localStorage.getItem(STORAGE_KEY)
+  //   if (stored) {
+  //     try {
+  //       const data = JSON.parse(stored)
+  //       goals.value = data.goals || []
+  //       // 토큰이 있으면 사용자 정보 복원
+  //       const tokens = getTokens()
+  //       if (tokens && data.user) {
+  //         user.value = data.user
+  //       }
+  //     } catch {
+  //       goals.value = []
+  //     }
+  //   }
+  // }
+
 
   // Save to localStorage
-  const saveToStorage = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      user: user.value,
-      goals: goals.value
-    }))
-  }
+  // const saveToStorage = () => {
+  //   localStorage.setItem(STORAGE_KEY, JSON.stringify({
+  //     user: user.value,
+  //     goals: goals.value
+  //   }))
+  // }
 
   // Watch for changes and save
-  watch([user, goals], saveToStorage, { deep: true })
+  // watch([user, goals], saveToStorage, { deep: true })
 
   // ============ Auth Actions ============
 
@@ -58,6 +59,7 @@ export const useAppStore = defineStore('app', () => {
           nickname: loginId,
           createdAt: Date.now()
         }
+        await fetchGoals()
         return true
       }
       return false
@@ -327,17 +329,9 @@ export const useAppStore = defineStore('app', () => {
       const response = await transactionApi.getTransactions(startDate, endDate)
 
       if (response.result === 'SUCCESS') {
-        // 가져온 데이터로 transactions 상태 업데이트
-        // 주의: 현재는 단순히 해당 월 데이터만 보여주는 것이 아니라 전체 누적이 필요한지 확인 필요.
-        // 하지만 MainDashboard가 현재 store.transactions에 의존하므로, 
-        // 일단 서버에서 받은 데이터가 최신이므로 이를 로컬 상태에 병합하거나 교체해야 함.
-        // 여기서는 해당 월 데이터만 보여주는 시나리오가 아니라면 전체 리스트 관리가 복잡할 수 있음.
-        // 우선순위: 서버 데이터 > 로컬 데이터
-        // 간단한 구현: 받은 데이터로 기존 해당 월 데이터를 교체.
-
         const newTransactions = response.data
 
-        // 기존 transactions에서 해당 기간 외의 데이터는 유지하고, 해당 기간 데이터는 제거 후 새 데이터 추가
+        // 기존 transactions에서 해당 기간 외의 데이터는 유지
         const existingOthers = transactions.value.filter(t => {
           const tDate = new Date(t.date)
           return tDate < new Date(startDate) || tDate > new Date(endDate)
@@ -355,33 +349,96 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  // ============ Goal Actions (로컬 저장소만 사용) ============
+  // ============ Goal Actions ============
 
-  const addGoal = (goal) => {
-    const newGoal = {
-      ...goal,
-      id: `goal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: Date.now()
+  const fetchGoals = async () => {
+    try {
+      loading.value = true
+      const res = await goalApi.getGoals()
+      if (res.result === 'SUCCESS') {
+        goals.value = res.data.map(g => {
+          // Map backend fields to frontend model
+          const type = g.goalType === 'SAVING' ? 'savings' : 'spending'
+          const isSavings = type === 'savings'
+
+          // Calculate derived fields if missing in summary
+          const currentAmount = g.targetAmount * (g.progressRate / 100)
+
+          return {
+            id: g.goalId,
+            type: type,
+            title: g.title,
+            status: mapStatus(g.status), // Helper needed or inline
+            // Savings fields
+            targetAmount: g.targetAmount,
+            currentAmount: currentAmount,
+            progressRate: g.progressRate,
+            progress: g.progressRate, // Frontend uses both?
+            // Spending fields
+            category: g.category || '기타',
+            budgetLimit: g.targetAmount,
+            spentAmount: currentAmount,
+            usageRate: g.progressRate,
+            remaining: g.targetAmount - currentAmount,
+            // Common
+            startDate: g.startDate,
+            endDate: g.endDate,
+            rawStatus: g.status
+          }
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      loading.value = false
     }
-    goals.value.push(newGoal)
   }
 
-  const updateGoal = (id, updates) => {
-    const index = goals.value.findIndex(g => g.id === id)
-    if (index !== -1) {
-      goals.value[index] = { ...goals.value[index], ...updates }
+  const fetchGoalDetail = async (id) => {
+    try {
+      const res = await goalApi.getGoalDetail(id)
+      if (res.result === 'SUCCESS') {
+        return res.data
+      }
+    } catch (err) {
+      console.error(err)
     }
+    return null
   }
 
-  const deleteGoal = (id) => {
-    goals.value = goals.value.filter(g => g.id !== id)
+  const mapStatus = (backendStatus) => {
+    // Backend: COMPLETED, ACTIVE? 
+    // Frontend expects: COMPLETED, on-track, warning, exceeded
+    if (backendStatus === 'COMPLETED') return 'COMPLETED'
+    // Default to on-track or simple mapping if generic
+    return 'on-track'
   }
+
+  const addGoal = async (goal) => {
+    if (goal.type === 'savings') {
+      await goalApi.createSavingGoal(goal)
+    } else {
+      await goalApi.createExpenseGoal(goal)
+    }
+    await fetchGoals()
+  }
+
+  const updateGoal = async (id, updates) => {
+    await goalApi.updateGoal(id, updates)
+    await fetchGoals()
+  }
+
+  const deleteGoal = async (id) => {
+    await goalApi.deleteGoal(id)
+    await fetchGoals()
+  }
+
 
   // ============ Computed ============
   const isAuthenticated = computed(() => !!user.value || !!getTokens())
 
   // ============ Initialize ============
-  loadFromStorage()
+  // loadFromStorage()
 
   return {
     // State
@@ -409,6 +466,8 @@ export const useAppStore = defineStore('app', () => {
     deleteTransaction: deleteTransactionById,
     fetchTransactions,
     // Goal actions
+    fetchGoals,
+    fetchGoalDetail,
     addGoal,
     updateGoal,
     deleteGoal
