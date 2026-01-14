@@ -24,6 +24,12 @@ export const clearTokens = () => {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+const toQueryString = (params = {}) => {
+    return Object.entries(params)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join('&')
+}
+
 // API 요청 헬퍼
 export const apiRequest = async (endpoint, options = {}) => {
   const tokens = getTokens()
@@ -38,10 +44,19 @@ export const apiRequest = async (endpoint, options = {}) => {
     headers['Authorization'] = `Bearer ${tokens.accessToken}`
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers
-  })
+    let url = `${API_BASE_URL}${endpoint}`
+
+// GET 요청이면 params를 query string으로 붙임
+    if (options.method?.toUpperCase() === 'GET' && options.params) {
+        const qs = toQueryString(options.params)
+        url += qs ? `?${qs}` : ''
+    }
+
+// fetch에서 url 변수를 사용해야 함
+    const response = await fetch(url, {
+        ...options,
+        headers
+    })
 
   // 401 에러 시 토큰 갱신 시도
   if (response.status === 401 && tokens?.refreshToken && !options.isRetry) {
