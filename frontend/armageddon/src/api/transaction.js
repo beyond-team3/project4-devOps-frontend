@@ -102,9 +102,13 @@ export const getTransactions = async (startDate, endDate) => {
 }
 
 export const getTransaction = async (transactionId) => {
-    const response = await apiRequest(`/transaction/modal?id=${transactionId}`, { method: 'GET' })
+    const response = await apiRequest(`/transaction/modal?transactionId=${transactionId}`, { method: 'GET' })
     if (response.result === 'SUCCESS' && response.data) {
-        return transformTransaction(response.data)
+        // 백엔드가 List 형태로 반환하므로 첫 번째 요소를 사용해야 함
+        const data = Array.isArray(response.data) ? response.data[0] : response.data
+        if (data) {
+            return transformTransaction(data)
+        }
     }
     return null
 }
@@ -116,16 +120,53 @@ export const getMonthlySummary = async (year, month) => {
 
 // 일간 거래
 export const getDailyTransactions = async (date) => {
+    // console.log(`[API] getDailyTransactions fetching: ${date}`)
     const response = await apiRequest(`/transaction/daily?date=${date}`, { method: 'GET' })
     if (response.result === 'SUCCESS' && Array.isArray(response.data)) {
-        return { ...response, data: response.data.map(transformTransaction) }
+        // console.log(`[API] getDailyTransactions success (${date}):`, response.data.length, 'items')
+        // 백엔드가 date 필드를 안 주므로 수동으로 추가
+        return {
+            ...response,
+            data: response.data.map(item => transformTransaction({ ...item, date }))
+        }
     }
+    console.warn(`[API] getDailyTransactions fail or invalid (${date}):`, response)
     return { result: 'FAIL', data: [] }
+}
+
+// 날짜 정규화 함수 (YYYY-MM-DD)
+const normalizeDate = (dateStr) => {
+    console.log('[normalizeDate] 입력:', dateStr, 'Type:', typeof dateStr)
+    if (!dateStr) {
+        console.log('[normalizeDate] 빈 값 -> 빈 문자열 반환')
+        return ''
+    }
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) {
+        console.log('[normalizeDate] 파싱 실패 -> 원본 반환:', dateStr)
+        return dateStr
+    }
+
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const result = `${year}-${month}-${day}`
+    console.log('[normalizeDate] 결과:', result)
+    return result
 }
 
 // API -> 프론트용 변환
 export const transformTransaction = (apiTransaction) => {
+    console.log('[transformTransaction] 백엔드 응답:', apiTransaction)
     const type = enumToType[apiTransaction.type] || 'expense'
+
+    // date가 없으면 생성일로 대체 시도
+    let finalDate = apiTransaction.date
+    console.log('[transformTransaction] apiTransaction.date:', apiTransaction.date)
+    if (!finalDate && apiTransaction.createdAt) {
+        finalDate = new Date(apiTransaction.createdAt).toISOString().split('T')[0]
+        console.log('[transformTransaction] createdAt 사용:', finalDate)
+    }
 
     return {
         id: apiTransaction.id,
@@ -136,7 +177,7 @@ export const transformTransaction = (apiTransaction) => {
         category: type === 'income'
             ? '수입'
             : enumToCategory[apiTransaction.category] || '기타',
-        date: apiTransaction.date,
+        date: normalizeDate(finalDate),
         memo: apiTransaction.memo ?? apiTransaction.MEMO ?? '',
         createdAt: apiTransaction.createdAt || Date.now()
     }
