@@ -12,11 +12,11 @@ const isModalOpen = ref(false)
 
 const totals = computed(() => {
   const income = store.transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0)
   const expense = store.transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
   return {
     income,
     expense,
@@ -26,8 +26,8 @@ const totals = computed(() => {
 
 const recentTransactions = computed(() => {
   return [...store.transactions]
-    .sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id) // 날짜 내림차순 정렬 강화
-    .slice(0, 5)
+      .sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id) // 날짜 내림차순 정렬 강화
+      .slice(0, 5)
 })
 
 const year = computed(() => currentDate.value.getFullYear())
@@ -56,11 +56,11 @@ const transactionsByDate = computed(() => {
 const getDayTotals = (dateStr) => {
   const dayTransactions = transactionsByDate.value[dateStr] || []
   const income = dayTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0)
   const expense = dayTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
   return { income, expense }
 }
 
@@ -69,7 +69,9 @@ const getDateString = (day) => {
 }
 
 const loadMonthlyData = async () => {
+  await store.fetchMonthlyData(year.value, month.value)
   await store.fetchTransactions(year.value, month.value)
+
 }
 
 const prevMonth = () => {
@@ -176,46 +178,46 @@ onMounted(() => {
         <div class="card-content">
           <div class="grid grid-cols-7 gap-2">
             <div
-              v-for="day in ['일', '월', '화', '수', '목', '금', '토']"
-              :key="day"
-              class="text-center text-sm py-2"
-              style="color: #364C84"
+                v-for="(dayName, index) in ['일', '월', '화', '수', '목', '금', '토']"
+                :key="dayName"
+                class="text-center text-sm py-2 font-bold"
+                :style="{
+                  color: index === 0 ? '#ED1C24' : index === 6 ? '#0b39b4' : '#000000'
+                }"
             >
-              {{ day }}
+              {{ dayName }}
             </div>
             <div
-              v-for="i in calendarData.startingDayOfWeek"
-              :key="'empty-' + i"
-              class="aspect-square"
+                v-for="i in calendarData.startingDayOfWeek"
+                :key="'empty-' + i"
+                class="aspect-square"
             />
             <button
-              v-for="day in calendarData.daysInMonth"
-              :key="day"
-              @click="handleDayClick(getDateString(day))"
-              class="aspect-square rounded-lg p-1 flex flex-col items-center justify-start transition-all cursor-pointer hover:shadow-md hover:scale-105 bg-white border border-transparent hover:border-blue-200"
-              :class="{
-                'bg-blue-50/50': getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0
-              }"
-              :style="{
-                border: (getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0) ? '1px solid #DBE3E9' : ''
-              }"
+                v-for="day in calendarData.daysInMonth"
+                :key="day"
+                @click="handleDayClick(getDateString(day))"
+                class="aspect-square rounded-lg p-1 flex flex-col items-center transition-all cursor-pointer hover:shadow-md hover:scale-105 bg-[var(--bt-bg)] border border-transparent hover:border-blue-200"
+                :class="{
+    'bg-white': getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0
+  }"
+                :style="{
+    border: (getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0) ? '1px solid #DBE3E9' : ''
+  }"
             >
-              <div class="text-sm" style="color: #000000">{{ day }}</div>
-              <div
-                v-if="getDayTotals(getDateString(day)).expense > 0"
-                class="text-xs mt-0.5"
-                style="color: #ED1C24"
-              >
-                -{{ getDayTotals(getDateString(day)).expense.toLocaleString() }}
-              </div>
-              <div
-                v-if="getDayTotals(getDateString(day)).income > 0"
-                class="text-xs"
-                style="color: #22B14C"
-              >
+              <!-- 날짜와 금액 사이만 간격 -->
+              <div class="text-sm font-medium mb-3" style="color: #000000">{{ day }}</div>
+
+              <!-- 수입 -->
+              <div v-if="getDayTotals(getDateString(day)).income > 0" class="text-xs" style="color: #22B14C">
                 +{{ getDayTotals(getDateString(day)).income.toLocaleString() }}
               </div>
+
+              <!-- 지출 -->
+              <div v-if="getDayTotals(getDateString(day)).expense > 0" class="text-xs" style="color: #ED1C24">
+                -{{ getDayTotals(getDateString(day)).expense.toLocaleString() }}
+              </div>
             </button>
+
           </div>
         </div>
       </div>
@@ -228,25 +230,25 @@ onMounted(() => {
         <div class="card-content">
           <div class="space-y-3">
             <div
-              v-if="recentTransactions.length === 0"
-              class="text-center text-muted-foreground py-8"
+                v-if="recentTransactions.length === 0"
+                class="text-center text-muted-foreground py-8"
             >
               거래 내역이 없습니다
             </div>
             <div
-              v-else
-              v-for="txn in recentTransactions"
-              :key="txn.id"
-              @click="handleTransactionClick(txn)"
-              class="flex items-center justify-between py-2 border-b cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors"
+                v-else
+                v-for="txn in recentTransactions"
+                :key="txn.id"
+                @click="handleTransactionClick(txn)"
+                class="flex items-center justify-between py-2 border-b cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors"
             >
               <div class="flex-1 min-w-0 pr-2">
                 <div class="text-sm font-medium truncate">{{ txn.title }}</div>
                 <div class="text-xs text-muted-foreground">{{ txn.date }}</div>
               </div>
               <div
-                class="text-sm whitespace-nowrap"
-                :style="{ color: txn.type === 'expense' ? '#ED1C24' : '#22B14C' }"
+                  class="text-sm whitespace-nowrap"
+                  :style="{ color: txn.type === 'expense' ? '#ED1C24' : '#22B14C' }"
               >
                 {{ txn.type === 'expense' ? '-' : '+' }}{{ txn.amount.toLocaleString() }}원
               </div>
@@ -258,11 +260,11 @@ onMounted(() => {
 
     <!-- Transaction Modal -->
     <TransactionModal
-      :is-open="isModalOpen"
-      :selected-date="selectedDate"
-      :initial-transactions="selectedDayTransactions"
-      :initial-edit-data="selectedTransaction"
-      @close="closeModal"
+        :is-open="isModalOpen"
+        :selected-date="selectedDate"
+        :initial-transactions="selectedDayTransactions"
+        :initial-edit-data="selectedTransaction"
+        @close="closeModal"
     />
   </div>
 </template>
