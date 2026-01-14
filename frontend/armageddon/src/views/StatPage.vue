@@ -98,6 +98,7 @@ const onPeriodChange = async ({ startDate, endDate }) => {
 
   <template v-else>
     <SummaryCards
+        class="summary-cards"
         :totalIncome="summaryData.totalIncome"
         :totalExpense="summaryData.totalExpense"
         :netProfit="summaryData.netProfit"
@@ -109,18 +110,25 @@ const onPeriodChange = async ({ startDate, endDate }) => {
       <CategoryDonutChart :data="categoryExpenses" />
     </div>
 
-    <ExpenseTrendChart :data="trendData" :unit="trendUnit" />
+    <div class="expense-trend-wrapper">
+      <ExpenseTrendChart :data="trendData" :unit="trendUnit" />
+    </div>
   </template>
 </template>
 
 <style scoped>
+
+.expense-trend-wrapper{
+  margin: 10px;
+}
+
+.summary-cards {
+  margin: 10px;
+}
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  margin: 10px;
 }
-</style>
-
-
-<style scoped>
 </style>
