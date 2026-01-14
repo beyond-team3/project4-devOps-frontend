@@ -9,4 +9,5 @@ export const CATEGORY_META = {
     EDUCATION: { label: '교육', icon: '📚', color: '#eab308' },
     SAVING: { label: '저축', icon: '💰', color: '#10b981' },
     EVENT: { label: '경조사', icon: '🎁', color: '#f59e0b' },
+    ETC: { label: '기타', icon: '📦', color: '#9ca3af' },
 }
