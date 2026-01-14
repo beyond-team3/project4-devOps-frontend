@@ -5,11 +5,13 @@ import PeriodSelector from '@/components/stat/PeriodSelector.vue'
 import SummaryCards from '@/components/stat/SummaryCards.vue'
 import TopExpenseList from '@/components/stat/TopExpenseList.vue'
 import CategoryDonutChart from '@/components/stat/CategoryDonutChart.vue'
+import ExpenseTrendChart from '@/components/stat/ExpenseTrendChart.vue';
 
 import {
   fetchSummaryStatistics,
   fetchTopExpenses,
   fetchCategoryExpenseStatistics,
+  fetchExpenseTrend
 } from '@/api/statistics'
 
 /* =====================
@@ -27,6 +29,10 @@ const summaryData = ref({
 
 const topExpenses = ref([])
 const categoryExpenses = ref([])
+
+//추이관련
+const trendData = ref([]) // 차트에 들어갈 데이터
+const trendUnit = ref('DAY') // 기본 DAY
 
 /* =====================
    lifecycle
@@ -64,9 +70,15 @@ const onPeriodChange = async ({ startDate, endDate }) => {
     const categoryRes = await fetchCategoryExpenseStatistics(params)
     categoryExpenses.value = categoryRes
 
+    // 4️⃣ 지출 추이
+    const trendParams = { ...params, unit: trendUnit.value }
+    const trendRes = await fetchExpenseTrend(trendParams)
+    trendData.value = trendRes.data // { label, amount } 배열
+
     console.log('🔥 summary:', summaryRes)
     console.log('🔥 top expenses:', topRes)
     console.log('🔥 category expenses:', categoryRes)
+    console.log('🔥 trend data:', trendRes)
   } catch (e) {
     console.error(e)
     error.value = '통계 데이터를 불러오지 못했습니다.'
@@ -96,6 +108,8 @@ const onPeriodChange = async ({ startDate, endDate }) => {
       <TopExpenseList :expenses="topExpenses" />
       <CategoryDonutChart :data="categoryExpenses" />
     </div>
+
+    <ExpenseTrendChart :data="trendData" :unit="trendUnit" />
   </template>
 </template>
 
