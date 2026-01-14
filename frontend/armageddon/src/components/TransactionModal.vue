@@ -65,11 +65,24 @@ const setAddMode = () => {
   }
 }
 
-const setEditMode = (txn) => {
+const setEditMode = async (txn) => {
   mode.value = 'edit'
+  // 기본 데이터로 먼저 채움 (빠른 UI 반응)
   formData.value = {
     ...txn,
-    amount: String(txn.amount)
+    amount: String(txn.amount),
+    memo: txn.memo || '' // 1차적으로 있는거 씀
+  }
+
+  // 상세 데이터 비동기 로드 (Memo가 없을 수 있으므로)
+  if (txn.id) {
+    const detail = await store.fetchTransactionDetail(txn.id)
+    if (detail) {
+      formData.value = {
+        ...formData.value,
+        memo: detail.memo || ''
+      }
+    }
   }
 }
 
