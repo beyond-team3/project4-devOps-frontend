@@ -9,6 +9,7 @@ const currentDate = ref(new Date())
 const selectedDate = ref(null)
 const selectedTransaction = ref(null) // For editing direct from recent list
 const isModalOpen = ref(false)
+const loading = ref(false)
 
 const totals = computed(() => {
   const income = store.transactions
@@ -44,12 +45,23 @@ const calendarData = computed(() => {
 
 const transactionsByDate = computed(() => {
   const grouped = {}
+  if (store.transactions.length > 0) {
+      // console.log('[MainDashboard] First txn date:', store.transactions[0].date, 'Type:', typeof store.transactions[0].date)
+  }
+  
   store.transactions.forEach(t => {
-    if (!grouped[t.date]) {
-      grouped[t.date] = []
+    // 날짜 매칭 디버깅을 위해 정규화 한번 더 보장 (안전장치)
+    const rawDate = t.date
+    // 혹시 모를 공백 제거
+    const simpleDate = rawDate ? String(rawDate).trim().split('T')[0] : ''
+    
+    if (!grouped[simpleDate]) {
+      grouped[simpleDate] = []
     }
-    grouped[t.date].push(t)
+    grouped[simpleDate].push(t)
   })
+  
+  // console.log('[MainDashboard] Grouped keys:', Object.keys(grouped))
   return grouped
 })
 
@@ -69,9 +81,18 @@ const getDateString = (day) => {
 }
 
 const loadMonthlyData = async () => {
-  await store.fetchMonthlyData(year.value, month.value)
-  await store.fetchTransactions(year.value, month.value)
-
+  loading.value = true
+  try {
+    await store.fetchMonthlyData(year.value, month.value)
+    // 우선 빠르게 5개라도 보여줌
+    await store.fetchTransactions(year.value, month.value)
+  } finally {
+    loading.value = false
+  }
+  
+  // 이후 전체 날짜 전수 조사 (백그라운드에서 실행, await 없이)
+  // 백엔드 제약을 우회하여 캘린더를 채우기 위함
+  store.fetchAllDaysInMonth(year.value, month.value)
 }
 
 const prevMonth = () => {
@@ -84,9 +105,18 @@ const nextMonth = () => {
   loadMonthlyData()
 }
 
-const handleDayClick = (dateStr) => {
+const handleDayClick = async (dateStr) => {
+  console.log('[MainDashboard] 날짜 클릭:', dateStr)
   selectedDate.value = dateStr
   selectedTransaction.value = null
+  
+  // 사용자 요청: 클릭 시 API 호출하여 최신 데이터 가져오기
+  console.log('[MainDashboard] fetchDailyTransactions 호출 전')
+  const result = await store.fetchDailyTransactions(dateStr)
+  console.log('[MainDashboard] fetchDailyTransactions 결과:', result)
+  console.log('[MainDashboard] store.dailyTransactions:', store.dailyTransactions)
+  console.log('[MainDashboard] selectedDayTransactions:', selectedDayTransactions.value)
+  
   isModalOpen.value = true
 }
 
@@ -98,7 +128,19 @@ const handleTransactionClick = (txn) => {
 }
 
 const selectedDayTransactions = computed(() => {
-  return selectedDate.value ? (transactionsByDate.value[selectedDate.value] || []) : []
+  console.log('[selectedDayTransactions] selectedDate:', selectedDate.value)
+  console.log('[selectedDayTransactions] dailyTransactions:', store.dailyTransactions)
+  
+  // 날짜 클릭 후 API 호출했다면 dailyTransactions를 우선 사용
+  if (selectedDate.value && store.dailyTransactions.length > 0) {
+    console.log('[selectedDayTransactions] dailyTransactions 사용:', store.dailyTransactions.length, '건')
+    return store.dailyTransactions
+  }
+  
+  // 아니면 기존 로직(전체 리스트에서 필터링) 사용 (Fallback)
+  const fallback = selectedDate.value ? (transactionsByDate.value[selectedDate.value] || []) : []
+  console.log('[selectedDayTransactions] Fallback 사용:', fallback.length, '건')
+  return fallback
 })
 
 const closeModal = () => {
