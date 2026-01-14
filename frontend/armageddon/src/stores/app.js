@@ -16,23 +16,6 @@ export const useAppStore = defineStore('app', () => {
   const selectedDate = ref(null)
 
   // Load from localStorage (for goals - 백엔드에 Goal API가 없으므로 로컬 저장)
-  const loadFromStorage = () => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try {
-        const data = JSON.parse(stored)
-        goals.value = data.goals || []
-        // 토큰이 있으면 사용자 정보 복원
-        const tokens = getTokens()
-        if (tokens && data.user) {
-          user.value = data.user
-        }
-      } catch {
-        goals.value = []
-      }
-    }
-  }
-  // Load from localStorage (for goals - 백엔드에 Goal API가 없으므로 로컬 저장)
   // const loadFromStorage = () => {
   //   const stored = localStorage.getItem(STORAGE_KEY)
   //   if (stored) {
@@ -426,16 +409,11 @@ export const useAppStore = defineStore('app', () => {
 
     // 로컬 초기화 방지: 기존 데이터를 유지하면서 병합할 준비
     // (월 이동 시에는 초기화가 맞지만, 같은 월 안에서 갱신될 때는 날아가면 안 됨)
-    // 하지만 사용처에서 year, month가 바뀌면 싹다 갈아엎는게 맞으므로 
-    // 여기서는 단순히 'API 응답(5개) + 기존 로컬 데이터 중 해당 월 데이터'를 합치는 꼼수를 부리기가 애매함.
-    // 차선책: API가 주는 5개를 우선시하되, 기존 데이터 중 API 결과에 없는 것도 남겨둠 (중복 제거)
 
     const res = await transactionApi.getTransactions(startDate, endDate)
     if (res.result === 'SUCCESS') {
       const newTxns = res.data
 
-      // [수정] 백엔드가 '최근 5건'만 리턴하더라도, 캘린더에는 기존에 로드된 데이터가 보여야 함.
-      // 따라서 절대 덮어쓰지 않고, '기존 데이터 + 새로운 데이터'를 병합(Merge)함.
       const mergedMap = new Map()
 
       // 1. 기존 데이터 매핑
@@ -458,13 +436,7 @@ export const useAppStore = defineStore('app', () => {
 
   // [신규] 월간 데이터 전수 조사 (백엔드 5개 제한 우회)
   // 해당 월의 모든 날짜에 대해 일간 조회를 수행하여 데이터를 긁어옴
-  // [신규] 월간 데이터 전수 조사 (백엔드 5개 제한 우회)
-  // 해당 월의 모든 날짜에 대해 일간 조회를 수행하여 데이터를 긁어옴
   const fetchAllDaysInMonth = async (year, month) => {
-    // loading 처리는 선택적 (UX에 따라 배경에서 돌릴지 결정)
-    // 여기서는 일단 데이터 채우는게 목적이므로 loading 없이 조용히 병합하거나,
-    // 필요하면 loading=true로 잡음. 사용자가 '안 보인다'고 했으니 확실하게 하기 위해 로딩 잡는게 나을 수도 있지만
-    // 30번 호출이라 오래 걸릴 수 있음. 일단 데이터 병합에 집중.
 
     try {
       console.log(`[fetchAllDaysInMonth] Start fetching for ${year}-${month + 1} (Sequential)`)
@@ -564,6 +536,51 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+// ============ Goal Actions ============
+
+  const fetchGoals = async () => {
+    try {
+      loading.value = true
+      const res = await goalApi.getGoals()
+      if (res.result === 'SUCCESS') {
+        goals.value = res.data.map(g => {
+          // Map backend fields to frontend model
+          const type = g.goalType === 'SAVING' ? 'savings' : 'spending'
+          const isSavings = type === 'savings'
+
+          // Calculate derived fields if missing in summary
+          const currentAmount = g.targetAmount * (g.progressRate / 100)
+
+          return {
+            id: g.goalId,
+            type: type,
+            title: g.title,
+            status: mapStatus(g.status), // Helper needed or inline
+            // Savings fields
+            targetAmount: g.targetAmount,
+            currentAmount: currentAmount,
+            progressRate: g.progressRate,
+            progress: g.progressRate, // Frontend uses both?
+            // Spending fields
+            category: g.category || '기타',
+            budgetLimit: g.targetAmount,
+            spentAmount: currentAmount,
+            usageRate: g.progressRate,
+            remaining: g.targetAmount - currentAmount,
+            // Common
+            startDate: g.startDate,
+            endDate: g.endDate,
+            rawStatus: g.status
+          }
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      loading.value = false
+    }
+  }
+
   const fetchGoalDetail = async (id) => {
     try {
       const res = await goalApi.getGoalDetail(id)
@@ -577,7 +594,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   const mapStatus = (backendStatus) => {
-    // Backend: COMPLETED, ACTIVE?
+    // Backend: COMPLETED, ACTIVE? 
     // Frontend expects: COMPLETED, on-track, warning, exceeded
     if (backendStatus === 'COMPLETED') return 'COMPLETED'
     // Default to on-track or simple mapping if generic
@@ -602,7 +619,6 @@ export const useAppStore = defineStore('app', () => {
     await goalApi.deleteGoal(id)
     await fetchGoals()
   }
-
 
   // ============ Computed ============
   const isAuthenticated = computed(() => !!user.value || !!getTokens())
