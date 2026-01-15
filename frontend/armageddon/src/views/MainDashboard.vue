@@ -9,14 +9,15 @@ const currentDate = ref(new Date())
 const selectedDate = ref(null)
 const selectedTransaction = ref(null) // For editing direct from recent list
 const isModalOpen = ref(false)
+const loading = ref(false)
 
 const totals = computed(() => {
   const income = store.transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0)
   const expense = store.transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
   return {
     income,
     expense,
@@ -26,8 +27,8 @@ const totals = computed(() => {
 
 const recentTransactions = computed(() => {
   return [...store.transactions]
-    .sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id) // 날짜 내림차순 정렬 강화
-    .slice(0, 5)
+      .sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id) // 날짜 내림차순 정렬 강화
+      .slice(0, 5)
 })
 
 const year = computed(() => currentDate.value.getFullYear())
@@ -44,23 +45,34 @@ const calendarData = computed(() => {
 
 const transactionsByDate = computed(() => {
   const grouped = {}
+  if (store.transactions.length > 0) {
+      // console.log('[MainDashboard] First txn date:', store.transactions[0].date, 'Type:', typeof store.transactions[0].date)
+  }
+  
   store.transactions.forEach(t => {
-    if (!grouped[t.date]) {
-      grouped[t.date] = []
+    // 날짜 매칭 디버깅을 위해 정규화 한번 더 보장 (안전장치)
+    const rawDate = t.date
+    // 혹시 모를 공백 제거
+    const simpleDate = rawDate ? String(rawDate).trim().split('T')[0] : ''
+    
+    if (!grouped[simpleDate]) {
+      grouped[simpleDate] = []
     }
-    grouped[t.date].push(t)
+    grouped[simpleDate].push(t)
   })
+  
+  // console.log('[MainDashboard] Grouped keys:', Object.keys(grouped))
   return grouped
 })
 
 const getDayTotals = (dateStr) => {
   const dayTransactions = transactionsByDate.value[dateStr] || []
   const income = dayTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0)
   const expense = dayTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
   return { income, expense }
 }
 
@@ -69,7 +81,18 @@ const getDateString = (day) => {
 }
 
 const loadMonthlyData = async () => {
-  await store.fetchTransactions(year.value, month.value)
+  loading.value = true
+  try {
+    await store.fetchMonthlyData(year.value, month.value)
+    // 우선 빠르게 5개라도 보여줌
+    await store.fetchTransactions(year.value, month.value)
+  } finally {
+    loading.value = false
+  }
+  
+  // 이후 전체 날짜 전수 조사 (백그라운드에서 실행, await 없이)
+  // 백엔드 제약을 우회하여 캘린더를 채우기 위함
+  store.fetchAllDaysInMonth(year.value, month.value)
 }
 
 const prevMonth = () => {
@@ -82,9 +105,18 @@ const nextMonth = () => {
   loadMonthlyData()
 }
 
-const handleDayClick = (dateStr) => {
+const handleDayClick = async (dateStr) => {
+  console.log('[MainDashboard] 날짜 클릭:', dateStr)
   selectedDate.value = dateStr
   selectedTransaction.value = null
+  
+  // 사용자 요청: 클릭 시 API 호출하여 최신 데이터 가져오기
+  console.log('[MainDashboard] fetchDailyTransactions 호출 전')
+  const result = await store.fetchDailyTransactions(dateStr)
+  console.log('[MainDashboard] fetchDailyTransactions 결과:', result)
+  console.log('[MainDashboard] store.dailyTransactions:', store.dailyTransactions)
+  console.log('[MainDashboard] selectedDayTransactions:', selectedDayTransactions.value)
+  
   isModalOpen.value = true
 }
 
@@ -96,7 +128,19 @@ const handleTransactionClick = (txn) => {
 }
 
 const selectedDayTransactions = computed(() => {
-  return selectedDate.value ? (transactionsByDate.value[selectedDate.value] || []) : []
+  console.log('[selectedDayTransactions] selectedDate:', selectedDate.value)
+  console.log('[selectedDayTransactions] dailyTransactions:', store.dailyTransactions)
+  
+  // 날짜 클릭 후 API 호출했다면 dailyTransactions를 우선 사용
+  if (selectedDate.value && store.dailyTransactions.length > 0) {
+    console.log('[selectedDayTransactions] dailyTransactions 사용:', store.dailyTransactions.length, '건')
+    return store.dailyTransactions
+  }
+  
+  // 아니면 기존 로직(전체 리스트에서 필터링) 사용 (Fallback)
+  const fallback = selectedDate.value ? (transactionsByDate.value[selectedDate.value] || []) : []
+  console.log('[selectedDayTransactions] Fallback 사용:', fallback.length, '건')
+  return fallback
 })
 
 const closeModal = () => {
@@ -176,46 +220,46 @@ onMounted(() => {
         <div class="card-content">
           <div class="grid grid-cols-7 gap-2">
             <div
-              v-for="day in ['일', '월', '화', '수', '목', '금', '토']"
-              :key="day"
-              class="text-center text-sm py-2"
-              style="color: #364C84"
+                v-for="(dayName, index) in ['일', '월', '화', '수', '목', '금', '토']"
+                :key="dayName"
+                class="text-center text-sm py-2 font-bold"
+                :style="{
+                  color: index === 0 ? '#ED1C24' : index === 6 ? '#0b39b4' : '#000000'
+                }"
             >
-              {{ day }}
+              {{ dayName }}
             </div>
             <div
-              v-for="i in calendarData.startingDayOfWeek"
-              :key="'empty-' + i"
-              class="aspect-square"
+                v-for="i in calendarData.startingDayOfWeek"
+                :key="'empty-' + i"
+                class="aspect-square"
             />
             <button
-              v-for="day in calendarData.daysInMonth"
-              :key="day"
-              @click="handleDayClick(getDateString(day))"
-              class="aspect-square rounded-lg p-1 flex flex-col items-center justify-start transition-all cursor-pointer hover:shadow-md hover:scale-105 bg-white border border-transparent hover:border-blue-200"
-              :class="{
-                'bg-blue-50/50': getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0
-              }"
-              :style="{
-                border: (getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0) ? '1px solid #DBE3E9' : ''
-              }"
+                v-for="day in calendarData.daysInMonth"
+                :key="day"
+                @click="handleDayClick(getDateString(day))"
+                class="aspect-square rounded-lg p-1 flex flex-col items-center transition-all cursor-pointer hover:shadow-md hover:scale-105 bg-[var(--bt-bg)] border border-transparent hover:border-blue-200"
+                :class="{
+    'bg-white': getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0
+  }"
+                :style="{
+    border: (getDayTotals(getDateString(day)).income > 0 || getDayTotals(getDateString(day)).expense > 0) ? '1px solid #DBE3E9' : ''
+  }"
             >
-              <div class="text-sm" style="color: #000000">{{ day }}</div>
-              <div
-                v-if="getDayTotals(getDateString(day)).expense > 0"
-                class="text-xs mt-0.5"
-                style="color: #ED1C24"
-              >
-                -{{ getDayTotals(getDateString(day)).expense.toLocaleString() }}
-              </div>
-              <div
-                v-if="getDayTotals(getDateString(day)).income > 0"
-                class="text-xs"
-                style="color: #22B14C"
-              >
+              <!-- 날짜와 금액 사이만 간격 -->
+              <div class="text-sm font-medium mb-3" style="color: #000000">{{ day }}</div>
+
+              <!-- 수입 -->
+              <div v-if="getDayTotals(getDateString(day)).income > 0" class="text-xs" style="color: #22B14C">
                 +{{ getDayTotals(getDateString(day)).income.toLocaleString() }}
               </div>
+
+              <!-- 지출 -->
+              <div v-if="getDayTotals(getDateString(day)).expense > 0" class="text-xs" style="color: #ED1C24">
+                -{{ getDayTotals(getDateString(day)).expense.toLocaleString() }}
+              </div>
             </button>
+
           </div>
         </div>
       </div>
@@ -228,25 +272,25 @@ onMounted(() => {
         <div class="card-content">
           <div class="space-y-3">
             <div
-              v-if="recentTransactions.length === 0"
-              class="text-center text-muted-foreground py-8"
+                v-if="recentTransactions.length === 0"
+                class="text-center text-muted-foreground py-8"
             >
               거래 내역이 없습니다
             </div>
             <div
-              v-else
-              v-for="txn in recentTransactions"
-              :key="txn.id"
-              @click="handleTransactionClick(txn)"
-              class="flex items-center justify-between py-2 border-b cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors"
+                v-else
+                v-for="txn in recentTransactions"
+                :key="txn.id"
+                @click="handleTransactionClick(txn)"
+                class="flex items-center justify-between py-2 border-b cursor-pointer hover:bg-gray-50 px-2 rounded transition-colors"
             >
               <div class="flex-1 min-w-0 pr-2">
                 <div class="text-sm font-medium truncate">{{ txn.title }}</div>
                 <div class="text-xs text-muted-foreground">{{ txn.date }}</div>
               </div>
               <div
-                class="text-sm whitespace-nowrap"
-                :style="{ color: txn.type === 'expense' ? '#ED1C24' : '#22B14C' }"
+                  class="text-sm whitespace-nowrap"
+                  :style="{ color: txn.type === 'expense' ? '#ED1C24' : '#22B14C' }"
               >
                 {{ txn.type === 'expense' ? '-' : '+' }}{{ txn.amount.toLocaleString() }}원
               </div>
@@ -258,11 +302,11 @@ onMounted(() => {
 
     <!-- Transaction Modal -->
     <TransactionModal
-      :is-open="isModalOpen"
-      :selected-date="selectedDate"
-      :initial-transactions="selectedDayTransactions"
-      :initial-edit-data="selectedTransaction"
-      @close="closeModal"
+        :is-open="isModalOpen"
+        :selected-date="selectedDate"
+        :initial-transactions="selectedDayTransactions"
+        :initial-edit-data="selectedTransaction"
+        @close="closeModal"
     />
   </div>
 </template>

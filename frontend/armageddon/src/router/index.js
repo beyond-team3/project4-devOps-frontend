@@ -31,12 +31,6 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/log',
-    name: 'log',
-    component: () => import('../views/LogPage.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/stat',
     name: 'stat',
     component: () => import('../views/StatPage.vue'),

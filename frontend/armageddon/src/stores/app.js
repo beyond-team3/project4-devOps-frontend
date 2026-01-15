@@ -11,6 +11,9 @@ export const useAppStore = defineStore('app', () => {
   const goals = ref([])
   const loading = ref(false)
   const error = ref(null)
+  const monthlySummary = ref(null)
+  const dailyTransactions = ref([])
+  const selectedDate = ref(null)
 
   // Load from localStorage (for goals - 백엔드에 Goal API가 없으므로 로컬 저장)
   // const loadFromStorage = () => {
@@ -29,7 +32,6 @@ export const useAppStore = defineStore('app', () => {
   //     }
   //   }
   // }
-
 
   // Save to localStorage
   // const saveToStorage = () => {
@@ -240,13 +242,23 @@ export const useAppStore = defineStore('app', () => {
     try {
       const response = await transactionApi.createTransaction(transaction)
       if (response.result === 'SUCCESS') {
-        // 로컬 상태에도 추가 (서버에서 ID 반환 시 사용)
-        const newTransaction = {
-          ...transaction,
-          id: response.data || `txn-${Date.now()}`,
-          createdAt: Date.now()
+        // 저장 성공 후, 해당 날짜의 일간 내역을 다시 불러와서 ID를 동기화
+        await fetchDailyTransactions(transaction.date)
+
+        if (dailyTransactions.value && dailyTransactions.value.length > 0) {
+          const mergedMap = new Map()
+
+          // 기존 데이터 유지
+          transactions.value.forEach(t => mergedMap.set(t.id, t))
+
+          // 일간 데이터 병합 (최신값 우선)
+          dailyTransactions.value.forEach(t => mergedMap.set(t.id, t))
+
+          const mergedList = Array.from(mergedMap.values())
+          mergedList.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id)
+
+          transactions.value = mergedList
         }
-        transactions.value.push(newTransaction)
         return true
       }
       return false
@@ -263,6 +275,20 @@ export const useAppStore = defineStore('app', () => {
       return true
     } finally {
       loading.value = false
+    }
+  }
+
+  // 거래 상세 조회 (Memo 필드 등 가져오기 위함)
+  const fetchTransactionDetail = async (id) => {
+    try {
+      // 임시 ID이면 조회 불가
+      if (typeof id === 'string' && id.startsWith('txn-')) return null
+
+      const detail = await transactionApi.getTransaction(id)
+      return detail
+    } catch (err) {
+      console.error(err)
+      return null
     }
   }
 
@@ -316,40 +342,201 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  // 거래 목록 조회 (기간)
-  const fetchTransactions = async (year, month) => {
+  // 월간 거래 + 요약 동시 로드
+  const fetchMonthlyData = async (year, month) => {
     loading.value = true
     error.value = null
     try {
-      // 해당 월의 시작일과 마지막일 계산
       const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
-      const lastDay = new Date(year, month + 1, 0).getDate()
-      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`
+      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`
 
-      const response = await transactionApi.getTransactions(startDate, endDate)
+      // 월간 거래 가져오기
+      const txnRes = await transactionApi.getTransactions(startDate, endDate)
+      if (txnRes.result === 'SUCCESS') {
+        const newTxns = txnRes.data
 
-      if (response.result === 'SUCCESS') {
-        const newTransactions = response.data
+        // [수정] 기존 로직(해당 월 데이터 삭제 후 5개 대체) 제거 -> 병합(Merge) 로직 적용
+        const mergedMap = new Map()
 
-        // 기존 transactions에서 해당 기간 외의 데이터는 유지
-        const existingOthers = transactions.value.filter(t => {
-          const tDate = new Date(t.date)
-          return tDate < new Date(startDate) || tDate > new Date(endDate)
-        })
+        // 1. 기존 데이터 전체 매핑
+        transactions.value.forEach(t => mergedMap.set(t.id, t))
 
-        transactions.value = [...existingOthers, ...newTransactions]
-        return true
+        // 2. 새로운 데이터(5개) 업데이트
+        newTxns.forEach(t => mergedMap.set(t.id, t))
+
+        // 3. 리스트 변환 및 정렬
+        const mergedList = Array.from(mergedMap.values())
+        mergedList.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id)
+
+        transactions.value = mergedList
       }
-      return false
+
+      // 월간 요약 가져오기
+      const summaryRes = await transactionApi.getMonthlySummary(year, month + 1)
+      monthlySummary.value = summaryRes
+      return true
     } catch (err) {
       error.value = err.message
       return false
+    } finally { loading.value = false }
+  }
+
+  // 일간 거래
+  const fetchDailyTransactions = async (date) => {
+    console.log('[Store] fetchDailyTransactions 호출:', date)
+    loading.value = true
+    error.value = null
+    try {
+      const res = await transactionApi.getDailyTransactions(date)
+      console.log('[Store] API 응답:', res)
+      console.log('[Store] 받은 데이터 개수:', res.data?.length || 0)
+      if (res.data && res.data.length > 0) {
+        console.log('[Store] 첫 번째 데이터:', res.data[0])
+      }
+      dailyTransactions.value = res.data
+      selectedDate.value = date
+      console.log('[Store] dailyTransactions 업데이트 완료:', dailyTransactions.value.length, '건')
+      return true
+    } catch (err) {
+      console.error('[Store] fetchDailyTransactions 에러:', err)
+      error.value = err.message
+      return false
+    } finally { loading.value = false }
+  }
+  const fetchTransactions = async (year, month) => {
+    const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`
+
+    // 로컬 초기화 방지: 기존 데이터를 유지하면서 병합할 준비
+    // (월 이동 시에는 초기화가 맞지만, 같은 월 안에서 갱신될 때는 날아가면 안 됨)
+
+    const res = await transactionApi.getTransactions(startDate, endDate)
+    if (res.result === 'SUCCESS') {
+      const newTxns = res.data
+
+      const mergedMap = new Map()
+
+      // 1. 기존 데이터 매핑
+      transactions.value.forEach(t => mergedMap.set(t.id, t))
+
+      // 2. 새로운 데이터 덮어쓰기 또는 추가
+      newTxns.forEach(t => mergedMap.set(t.id, t))
+
+      // 3. 배열로 변환 및 정렬
+      const mergedList = Array.from(mergedMap.values())
+      mergedList.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id)
+
+      transactions.value = mergedList
+      // 5개만 가져오는 걸로는 부족하므로 전체 일자 조회 트리거 (비동기)
+      // fetchTransactions가 끝난 후 호출하거나, 아예 loadMonthlyData에서 호출하도록 설계
+      return true
+    }
+    return false
+  }
+
+  // [신규] 월간 데이터 전수 조사 (백엔드 5개 제한 우회)
+  // 해당 월의 모든 날짜에 대해 일간 조회를 수행하여 데이터를 긁어옴
+  const fetchAllDaysInMonth = async (year, month) => {
+
+    try {
+      console.log(`[fetchAllDaysInMonth] Start fetching for ${year}-${month + 1} (Sequential)`)
+      const lastDay = new Date(year, month + 1, 0).getDate()
+
+      const mergedMap = new Map()
+      // 1. 기존 데이터 유지
+      if (transactions.value && transactions.value.length > 0) {
+        transactions.value.forEach(t => {
+          if (t && t.id) mergedMap.set(t.id, t)
+        })
+      }
+
+      let successCount = 0
+      let totalItemsFound = 0
+
+      for (let day = 1; day <= lastDay; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        try {
+          // 순차 호출로 백엔드 부하 방지 및 디버깅 용이성 확보
+          const res = await transactionApi.getDailyTransactions(dateStr)
+
+          if (res && res.result === 'SUCCESS') {
+            successCount++
+            if (Array.isArray(res.data) && res.data.length > 0) {
+              console.log(`[DailyFetch] Found ${res.data.length} items on ${dateStr}`)
+              totalItemsFound += res.data.length
+              res.data.forEach(t => {
+                if (t && t.id) mergedMap.set(t.id, t)
+              })
+            }
+          } else {
+            // console.warn(`[DailyFetch] ${dateStr} returned invalid/fail`)
+          }
+        } catch (err) {
+          console.error(`[DailyFetch] Error on ${dateStr}:`, err)
+        }
+      }
+
+      console.log(`[fetchAllDaysInMonth] Finished. Success: ${successCount}/${lastDay}, Items Found: ${totalItemsFound}`)
+
+      const mergedList = Array.from(mergedMap.values())
+      // 최신순 정렬
+      mergedList.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id)
+
+      console.log(`[fetchAllDaysInMonth] Final count updated to store: ${mergedList.length}`)
+      transactions.value = mergedList
+      return true
+    } catch (err) {
+      console.error('Failed to fetch all days:', err)
+      return false
+    }
+  }
+
+  // ============ Goal Actions ============
+
+  const fetchGoals = async () => {
+    try {
+      loading.value = true
+      const res = await goalApi.getGoals()
+      if (res.result === 'SUCCESS') {
+        goals.value = res.data.map(g => {
+          // Map backend fields to frontend model
+          const type = g.goalType === 'SAVING' ? 'savings' : 'spending'
+          const isSavings = type === 'savings'
+
+          // Calculate derived fields if missing in summary
+          const currentAmount = g.targetAmount * (g.progressRate / 100)
+
+          return {
+            id: g.goalId,
+            type: type,
+            title: g.title,
+            status: mapStatus(g.status), // Helper needed or inline
+            // Savings fields
+            targetAmount: g.targetAmount,
+            currentAmount: currentAmount,
+            progressRate: g.progressRate,
+            progress: g.progressRate, // Frontend uses both?
+            // Spending fields
+            category: g.category || '기타',
+            budgetLimit: g.targetAmount,
+            spentAmount: currentAmount,
+            usageRate: g.progressRate,
+            remaining: g.targetAmount - currentAmount,
+            // Common
+            startDate: g.startDate,
+            endDate: g.endDate,
+            rawStatus: g.status
+          }
+        })
+      }
+    } catch (err) {
+      console.error(err)
     } finally {
       loading.value = false
     }
   }
 
-  // ============ Goal Actions ============
+// ============ Goal Actions ============
 
   const fetchGoals = async () => {
     try {
@@ -433,7 +620,6 @@ export const useAppStore = defineStore('app', () => {
     await fetchGoals()
   }
 
-
   // ============ Computed ============
   const isAuthenticated = computed(() => !!user.value || !!getTokens())
 
@@ -461,10 +647,17 @@ export const useAppStore = defineStore('app', () => {
     requestPasswordReset,
     confirmPasswordReset,
     // Transaction actions
+    monthlySummary,
+    dailyTransactions,
+    selectedDate,
     addTransaction,
     updateTransaction,
     deleteTransaction: deleteTransactionById,
+    fetchMonthlyData,
+    fetchDailyTransactions,
     fetchTransactions,
+    fetchTransactionDetail,
+    fetchAllDaysInMonth,
     // Goal actions
     fetchGoals,
     fetchGoalDetail,

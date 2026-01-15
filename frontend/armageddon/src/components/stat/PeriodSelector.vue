@@ -124,6 +124,7 @@ watch([startDate, endDate], ([s, e], [oldS, oldE]) => {
 .buttons {
   display: flex;
   gap: 8px;
+  margin: 10px;
 }
 
 button {
