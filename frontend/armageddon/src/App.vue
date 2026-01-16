@@ -1,12 +1,11 @@
 <script setup>
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAppStore } from './stores/app'
 import { Toaster } from 'vue-sonner'
 import { User, Home, FileText, BarChart3, Target } from 'lucide-vue-next'
 
 const route = useRoute()
-const router = useRouter()
 const store = useAppStore()
 
 const isAuthenticated = computed(() => store.isAuthenticated)
@@ -16,7 +15,7 @@ const navItems = [
   { name: 'dashboard', label: '대시보드', icon: Home, to: '/dashboard' },
   { name: 'stat', label: '통계', icon: BarChart3, to: '/stat' },
   { name: 'goal', label: '목표', icon: Target, to: '/goal' },
-  { name: 'settings', label: '설정', icon: User, to: '/settings' }
+  { name: 'settings', label: '마이페이지', icon: User, to: '/settings' }
 ]
 
 const isActive = (name) => currentRouteName.value === name
@@ -31,7 +30,13 @@ const isActive = (name) => currentRouteName.value === name
         style="background-color: #FBFBF8; border-bottom: 1px solid #DBE3E9"
     >
       <div class="flex items-center justify-between px-6 py-4">
-        <h1 class="text-2xl" style="color: #000000">Armageddon</h1>
+        <router-link
+          to="/dashboard"
+          class="text-2xl font-semibold"
+          style="color: #000000"
+        >
+          Armageddon
+        </router-link>
         <nav class="flex items-center gap-2">
           <router-link
               v-for="item in navItems"
@@ -57,6 +62,6 @@ const isActive = (name) => currentRouteName.value === name
     </main>
 
     <!-- Toast notifications -->
-    <Toaster position="top-right" />
+    <Toaster position="top-center" />
   </div>
 </template>

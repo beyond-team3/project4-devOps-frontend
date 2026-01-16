@@ -148,6 +148,8 @@ const handleSubmit = async () => {
 }
 
 const handleDeleteAccount = async () => {
+  const confirmed = window.confirm('정말 탈퇴하시겠습니까? 사용자 정보가 모두 사라집니다.')
+  if (!confirmed) return
   await store.deleteAccount()
   toast.success('계정이 삭제되었습니다.')
   router.push('/login')
@@ -187,15 +189,15 @@ const handleLogout = async () => {
       <div v-if="!isEditing" class="card-content space-y-4">
         <div>
           <label class="label">아이디</label>
-          <p class="text-sm mt-1">{{ store.user?.loginId || '-' }}</p>
+          <p class="text-sm mt-1 text-gray-800">{{ store.user?.loginId || '-' }}</p>
         </div>
         <div>
           <label class="label">닉네임</label>
-          <p class="text-sm mt-1">{{ store.user?.nickname || '-' }}</p>
+          <p class="text-sm mt-1 text-gray-800">{{ store.user?.nickname || '-' }}</p>
         </div>
         <div>
           <label class="label">이메일</label>
-          <p class="text-sm mt-1">{{ store.user?.email || '-' }}</p>
+          <p class="text-sm mt-1 text-gray-800">{{ store.user?.email || '-' }}</p>
         </div>
       </div>
 
