@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet } from 'lucide-vue-next'
 import TransactionModal from '../components/TransactionModal.vue'
+import LoadingOverlay from '../components/LoadingOverlay.vue'
 
 const store = useAppStore()
 const currentDate = ref(new Date())
@@ -86,13 +87,11 @@ const loadMonthlyData = async () => {
     await store.fetchMonthlyData(year.value, month.value)
     // 우선 빠르게 5개라도 보여줌
     await store.fetchTransactions(year.value, month.value)
+    // 달력 데이터까지 모두 로딩 완료 후 로딩 화면 종료
+    await store.fetchAllDaysInMonth(year.value, month.value)
   } finally {
     loading.value = false
   }
-  
-  // 이후 전체 날짜 전수 조사 (백그라운드에서 실행, await 없이)
-  // 백엔드 제약을 우회하여 캘린더를 채우기 위함
-  store.fetchAllDaysInMonth(year.value, month.value)
 }
 
 const prevMonth = () => {
@@ -155,6 +154,9 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- 로딩 오버레이 -->
+  <LoadingOverlay v-if="loading" />
+  
   <div class="p-6 space-y-6">
     <!-- Top Summary Section -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
