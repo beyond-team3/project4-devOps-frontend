@@ -237,7 +237,6 @@ export const useAppStore = defineStore('app', () => {
 
     // 거래 추가
     const addTransaction = async (transaction) => {
-        loading.value = true
         error.value = null
         try {
             const response = await transactionApi.createTransaction(transaction)
@@ -273,8 +272,6 @@ export const useAppStore = defineStore('app', () => {
             }
             transactions.value.push(newTransaction)
             return true
-        } finally {
-            loading.value = false
         }
     }
 
@@ -294,17 +291,35 @@ export const useAppStore = defineStore('app', () => {
 
     // 거래 수정
     const updateTransaction = async (id, updates) => {
-        loading.value = true
         error.value = null
         try {
             // 숫자 ID인 경우에만 API 호출
             if (typeof id === 'number' || !id.toString().startsWith('txn-')) {
                 await transactionApi.updateTransaction(id, updates)
-            }
-            // 로컬 상태 업데이트
-            const index = transactions.value.findIndex(t => t.id === id)
-            if (index !== -1) {
-                transactions.value[index] = { ...transactions.value[index], ...updates }
+
+                // 수정 성공 후, 해당 날짜의 일간 내역을 다시 불러와서 동기화
+                await fetchDailyTransactions(updates.date)
+
+                if (dailyTransactions.value && dailyTransactions.value.length > 0) {
+                    const mergedMap = new Map()
+
+                    // 기존 데이터 유지
+                    transactions.value.forEach(t => mergedMap.set(t.id, t))
+
+                    // 일간 데이터 병합 (최신값 우선)
+                    dailyTransactions.value.forEach(t => mergedMap.set(t.id, t))
+
+                    const mergedList = Array.from(mergedMap.values())
+                    mergedList.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id)
+
+                    transactions.value = mergedList
+                }
+            } else {
+                // 로컬 전용 ID인 경우 로컬 상태만 업데이트
+                const index = transactions.value.findIndex(t => t.id === id)
+                if (index !== -1) {
+                    transactions.value[index] = { ...transactions.value[index], ...updates }
+                }
             }
             return true
         } catch (err) {
@@ -315,30 +330,55 @@ export const useAppStore = defineStore('app', () => {
                 transactions.value[index] = { ...transactions.value[index], ...updates, synced: false }
             }
             return true
-        } finally {
-            loading.value = false
         }
     }
 
     // 거래 삭제
     const deleteTransactionById = async (id) => {
-        loading.value = true
         error.value = null
+
+        // 삭제 전에 해당 거래의 날짜를 저장 (나중에 다시 불러오기 위함)
+        const transaction = transactions.value.find(t => t.id === id)
+        const transactionDate = transaction?.date
+
         try {
             // 숫자 ID인 경우에만 API 호출
             if (typeof id === 'number' || !id.toString().startsWith('txn-')) {
                 await transactionApi.deleteTransaction(id)
+
+                // 삭제 성공 후, 해당 날짜의 일간 내역을 다시 불러와서 동기화
+                if (transactionDate) {
+                    await fetchDailyTransactions(transactionDate)
+
+                    if (dailyTransactions.value) {
+                        const mergedMap = new Map()
+
+                        // 기존 데이터 유지
+                        transactions.value.forEach(t => {
+                            if (t.id !== id) { // 삭제된 항목 제외
+                                mergedMap.set(t.id, t)
+                            }
+                        })
+
+                        // 일간 데이터 병합 (최신값 우선)
+                        dailyTransactions.value.forEach(t => mergedMap.set(t.id, t))
+
+                        const mergedList = Array.from(mergedMap.values())
+                        mergedList.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id)
+
+                        transactions.value = mergedList
+                    }
+                }
+            } else {
+                // 로컬 전용 ID인 경우 로컬 상태에서만 제거
+                transactions.value = transactions.value.filter(t => t.id !== id)
             }
-            // 로컬 상태에서 제거
-            transactions.value = transactions.value.filter(t => t.id !== id)
             return true
         } catch (err) {
             error.value = err.message
             // API 실패해도 로컬에서 제거
             transactions.value = transactions.value.filter(t => t.id !== id)
             return true
-        } finally {
-            loading.value = false
         }
     }
 
@@ -384,7 +424,6 @@ export const useAppStore = defineStore('app', () => {
     // 일간 거래
     const fetchDailyTransactions = async (date) => {
         console.log('[Store] fetchDailyTransactions 호출:', date)
-        loading.value = true
         error.value = null
         try {
             const res = await transactionApi.getDailyTransactions(date)
@@ -401,7 +440,7 @@ export const useAppStore = defineStore('app', () => {
             console.error('[Store] fetchDailyTransactions 에러:', err)
             error.value = err.message
             return false
-        } finally { loading.value = false }
+        }
     }
     const fetchTransactions = async (year, month) => {
         const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
