@@ -1,11 +1,67 @@
-<script setup></script>
+<script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { useAppStore } from './stores/app'
+import { Toaster } from 'vue-sonner'
+import { User, Home, FileText, BarChart3, Target } from 'lucide-vue-next'
+
+const route = useRoute()
+const store = useAppStore()
+
+const isAuthenticated = computed(() => store.isAuthenticated)
+const currentRouteName = computed(() => route.name)
+
+const navItems = [
+  { name: 'dashboard', label: '대시보드', icon: Home, to: '/dashboard' },
+  { name: 'stat', label: '통계', icon: BarChart3, to: '/stat' },
+  { name: 'goal', label: '목표', icon: Target, to: '/goal' },
+  { name: 'settings', label: '마이페이지', icon: User, to: '/settings' }
+]
+
+const isActive = (name) => currentRouteName.value === name
+</script>
 
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
-</template>
+  <div class="min-h-screen flex flex-col">
+    <!-- Top Navigation (only when authenticated) -->
+    <header
+        v-if="isAuthenticated"
+        class="shadow-sm"
+        style="background-color: #FBFBF8; border-bottom: 1px solid #DBE3E9"
+    >
+      <div class="flex items-center justify-between px-6 py-4">
+        <router-link
+          to="/dashboard"
+          class="text-2xl font-semibold"
+          style="color: #000000"
+        >
+          Armageddon
+        </router-link>
+        <nav class="flex items-center gap-2">
+          <router-link
+              v-for="item in navItems"
+              :key="item.name"
+              :to="item.to"
+              class="btn"
+              :class="isActive(item.name) ? '' : 'btn-ghost'"
+              :style="isActive(item.name)
+              ? { backgroundColor: '#6AA6DA', color: '#FBFBF8' }
+              : { color: '#000000' }
+            "
+          >
+            <component :is="item.icon" class="size-4 mr-2" />
+            {{ item.label }}
+          </router-link>
+        </nav>
+      </div>
+    </header>
 
-<style scoped></style>
+    <!-- Main Content -->
+    <main class="flex-1">
+      <router-view />
+    </main>
+
+    <!-- Toast notifications -->
+    <Toaster position="top-center" />
+  </div>
+</template>
