@@ -14,9 +14,6 @@ RUN npm run build
 # Run 단계 (Nginx로 빌드된 파일 배포)
 FROM nginx:alpine
 
-# Nginx 설정 파일이 있다면 복사 (없으면 기본값 사용)
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
-
 # 빌드 단계에서 만든 결과물(dist 폴더)을 Nginx가 서비스할 경로로 복사
 COPY --from=builder /app/dist /usr/share/nginx/html
 
