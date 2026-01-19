@@ -200,7 +200,7 @@ const closeModal = () => {
           >
             <div class="flex-1 min-w-0 pr-3">
               <div class="flex items-center gap-2 mb-1">
-                <span class="text-xs px-2 py-0.5 rounded" style="background-color: #E1E5AC; color: #000000">
+                <span class="px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold">
                   {{ txn.category }}
                 </span>
                 <span class="font-medium text-gray-900 truncate">{{ txn.title }}</span>
