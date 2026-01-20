@@ -1,5 +1,5 @@
-# Build 단계
-FROM node:22-alpine AS builder
+# 빌드
+FROM node:22-alpine AS build-stage
 
 WORKDIR /app
 
@@ -11,16 +11,14 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Run 단계 (Nginx로 빌드된 파일 배포)
-FROM nginx:alpine
-
-# 빌드 단계에서 만든 결과물(dist 폴더)을 Nginx가 서비스할 경로로 복사
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# production stage
+# 배포 (Production Stage)
 FROM nginx:stable-alpine AS production-stage
+
+# 위에서 만든 'build-stage'의 결과물을 가져옴.
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
+# Nginx 설정 파일 복사
+# (경로가 frontend/armageddon/nginx/default.conf 에 있어야 함)
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
 # 80번 포트 노출
