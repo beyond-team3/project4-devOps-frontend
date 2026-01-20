@@ -42,15 +42,15 @@ pipeline {
                             sh 'ls -al'
 
                             if (isUnix()) {
-                                sh "docker build -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
-                                sh "docker build -t ${DOCKER_USER}/armageddon-frontend:latest ."
+                                sh "docker build --no-cache -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
+                                sh "docker build --no-cache -t ${DOCKER_USER}/armageddon-frontend:latest ."
                                 sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}"
                                 sh "docker push ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}"
                                 sh "docker push ${DOCKER_USER}/armageddon-frontend:latest"
                                 sh "docker logout"
                             } else {
-                                bat "docker build -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
-                                bat "docker build -t ${DOCKER_USER}/armageddon-frontend:latest ."
+                                bat "docker build --no-cache -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
+                                bat "docker build --no-cache -t ${DOCKER_USER}/armageddon-frontend:latest ."
                                 bat "docker login -u %DOCKER_USER% -p %DOCKER_PASS%"
                                 bat "docker push ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}"
                                 bat "docker push ${DOCKER_USER}/armageddon-frontend:latest"
