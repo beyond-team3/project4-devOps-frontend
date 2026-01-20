@@ -89,24 +89,12 @@ pipeline {
 
                             // 변경사항 커밋 및 푸시 (credential 사용)
                             sh """
-                                git add .
+                                git add frontend/deployment.yml
                                 git commit -m 'Update frontend image to ${currentBuild.number} [skip ci]' || echo 'No changes to commit'
                                 git push https://${GIT_USER}:${GIT_TOKEN}@github.com/beyond-team3/project4-devOps-frontend.git main
                             """
                         }
                     }
-                }
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                dir('frontend') {
-                    // ConfigMap, Deployment, Service 적용
-                    sh 'kubectl apply -f frontend/deployment.yml'
-
-                    // Deployment 재시작 (이미지 업데이트 반영)
-                    sh 'kubectl rollout restart deployment/frontend-deployment'
                 }
             }
         }
