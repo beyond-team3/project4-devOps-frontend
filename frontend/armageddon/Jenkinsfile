@@ -2,76 +2,56 @@ pipeline {
     agent any
 
     environment {
-        // DockerHub 및 Git 설정
-        DOCKER_REGISTRY = "guntinue/armageddon-frontend"
-        DOCKER_CREDENTIAL_ID = "DOCKERHUB_PASSWORD"  확인 필요
-        GIT_CREDENTIAL_ID = "guntinue-git-auth"
-        MANIFEST_REPO_URL = "https://github.com/beyond-team2/project4-devOps-manifests.git"
-        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        DOCKER_CRED = credentials('docker-hub-guntinue')
+        IMAGE_NAME = 'guntinue/armageddon-frontend'
     }
 
     stages {
-        stage('Checkout') {
+        // 노드 의존성 설치 및 빌드
+        stage('Build Node.js') {
             steps {
-                checkout scm
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                dir('frontend/armageddon') {
-                    script {
-                        echo "Building Docker Image..."
-                        sh "docker build -t ${DOCKER_REGISTRY}:${IMAGE_TAG} ."
-                        sh "docker build -t ${DOCKER_REGISTRY}:latest ."
-                    }
+                dir('frontend') {
+                    // Node.js가 젠킨스 서버에 설치되어 있어야 함
+                    // 없다면 docker agent를 쓰는 방법도 있지만 일단 쉘로 진행
+                    sh 'npm install'
+                    sh 'npm run build'
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        // 도커 이미지 빌드
+        stage('Docker Build') {
             steps {
-                script {
-                    echo "Pushing Docker Image..."
-                    withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIAL_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
-                        sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
-                        sh "docker push ${DOCKER_REGISTRY}:latest"
-                    }
+                dir('frontend') {
+                    // 플랫폼 명시 (Mac M1/M2 사용자를 위해 amd64 강제)
+                    sh 'docker build --no-cache --platform linux/amd64 -t $IMAGE_NAME:latest .'
                 }
             }
         }
 
-        stage('Update Manifest') {
+        // 도커 허브 푸시
+        stage('Docker Push') {
             steps {
-                script {
-                    echo "Updating Kubernetes Manifest..."
-                    withCredentials([usernamePassword(credentialsId: GIT_CREDENTIAL_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-                        sh """
-                            rm -rf manifest-repo
-                            git clone ${MANIFEST_REPO_URL} manifest-repo
-                            cd manifest-repo
-                            
-                            # Deployment 파일 내 이미지 태그 업데이트
-                            # 운영체제(Linux/Mac)에 따른 sed 호환성 고려 (Jenkins는 보통 Linux)
-                            sed -i 's|image: ${DOCKER_REGISTRY}:.*|image: ${DOCKER_REGISTRY}:${IMAGE_TAG}|g' armageddon_manifests/frontend/deployment.yml
-                            
-                            git config user.email "jenkins@pipeline.com"
-                            git config user.name "Jenkins Pipeline"
-                            
-                            git add armageddon_manifests/frontend/deployment.yml
-                            
-                            if ! git diff-index --quiet HEAD; then
-                                git commit -m "Update frontend image tag to ${IMAGE_TAG}"
-                                # Credential을 포함한 URL로 푸시
-                                git push https://${GIT_USER}:${GIT_PASS}@github.com/beyond-team2/project4-devOps-manifests.git HEAD:main
-                            else
-                                echo "No changes to commit."
-                            fi
-                        """
-                    }
-                }
+                sh 'echo $DOCKER_CRED_PSW | docker login -u $DOCKER_CRED_USR --password-stdin'
+                sh 'docker push $IMAGE_NAME:latest'
             }
+        }
+
+        // 배포
+        stage('Deploy to K8s') {
+            steps {
+                // 프론트엔드 파드 삭제 -> 재시작
+                sh 'kubectl delete pod -l app=frontend --ignore-not-found=true'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '🚀 프론트엔드 배포 완료! 사이트에서 확인해보세요.'
+        }
+        failure {
+            echo '💥 에러 발생! 도움!'
         }
     }
 }
