@@ -23,28 +23,19 @@ const formatDate = (date) =>
 </script>
 
 <template>
-  <div class="card">
+  <div class="top-list">
     <h3 class="title">상위 지출 항목</h3>
 
-    <div v-if="loading" class="center">로딩중...</div>
-
-    <ul v-else class="list">
-      <li
-          v-for="expense in expenses"
-          :key="expense.transactionId"
-          class="item"
-      >
+    <ul>
+      <li v-for="item in expenses" :key="item.id" class="item">
         <div class="left">
-          <div class="category">
-            {{ getCategory(expense.category).icon }}
-            {{ getCategory(expense.category).label }}
-          </div>
-          <div class="name">{{ expense.title }}</div>
-          <div class="date">{{ formatDate(expense.date) }}</div>
+          <div class="category">{{ item.category }}</div>
+          <div class="title-text">{{ item.title }}</div>
         </div>
 
-        <div class="amount">
-          -₩ {{ formatAmount(expense.amount) }}
+        <div class="right">
+          <div class="amount">-₩ {{ item.amount.toLocaleString() }}</div>
+          <div class="date">{{ item.date }}</div>
         </div>
       </li>
     </ul>
@@ -52,61 +43,58 @@ const formatDate = (date) =>
 </template>
 
 
+
 <style scoped>
-.card {
-  background: #fff;
-  padding: 16px;
-  border-radius: 12px;
+.top-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 12px;
+  font-weight: 700;
+  margin-bottom: 10px;
 }
 
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+ul {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
+/* 🔥 아이템을 가로 카드화 */
 .item {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  padding: 12px;
-  border-radius: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
   background: #f9fafb;
 }
 
-.left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+/* 왼쪽 */
+.left .category {
+  font-size: 12px;
+  opacity: 0.7;
 }
 
-.category {
-  font-size: 13px;
-  color: #6b7280;
+.left .title-text {
+  font-weight: 600;
 }
 
-.name {
-  font-weight: 500;
+/* 오른쪽 */
+.right {
+  text-align: right;
+}
+
+.amount {
+  color: #ef4444;
+  font-weight: 700;
 }
 
 .date {
   font-size: 12px;
-  color: #9ca3af;
+  opacity: 0.6;
 }
 
-.amount {
-  font-weight: 700;
-  color: #ef4444;
-}
-
-.center {
-  text-align: center;
-  color: #6b7280;
-}
 </style>
