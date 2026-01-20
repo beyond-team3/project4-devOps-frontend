@@ -18,19 +18,25 @@ const activeTab = ref('active') // 'active' or 'finished'
 
 const goalStats = computed(() => store.goals)
 
-const activeGoals = computed(() => goalStats.value
-  .filter(g => !['COMPLETED', 'FAILED'].includes(g.rawStatus))
-  .sort((a, b) => {
-    // Savings first
-    if (a.type === 'savings' && b.type !== 'savings') return -1
-    if (a.type !== 'savings' && b.type === 'savings') return 1
-    return 0
-  })
+const activeGoals = computed(() =>
+    goalStats.value
+        .filter(g =>
+            g.status === 'ACTIVE' ||
+            (g.status === 'EXCEEDED' && !isFinished(g))
+        )
+        .sort((a, b) => {
+          if (a.type === 'savings' && b.type !== 'savings') return -1
+          if (a.type !== 'savings' && b.type === 'savings') return 1
+          return 0
+        })
 )
 
-const finishedGoals = computed(() => goalStats.value.filter(g => 
-    ['COMPLETED', 'FAILED'].includes(g.rawStatus)
-))
+const finishedGoals = computed(() =>
+    goalStats.value.filter(g =>
+        isFinished(g) ||
+        ['COMPLETED', 'FAILED', 'SUCCESS'].includes(g.status)
+    )
+)
 
 const handleAddClick = () => {
   selectedGoal.value = null
@@ -117,6 +123,18 @@ const handleDetailClick = (id) => {
 onMounted(() => {
   store.fetchGoals()
 })
+
+const isFinished = (goal) => {
+  const end = new Date(goal.endDate)
+  const today = new Date()
+
+  // 시간 제거 (날짜 단위 비교)
+  end.setHours(23, 59, 59, 999)
+  today.setHours(0, 0, 0, 0)
+
+  return end < today
+}
+
 </script>
 
 <template>
@@ -180,8 +198,8 @@ onMounted(() => {
     />
 
     <GoalDetailModal
-      :is-open="!!detailGoalId"
-      :goal-id="detailGoalId"
+      :isOpen="!!detailGoalId"
+      :goalId="detailGoalId"
       @close="detailGoalId = null"
     />
   </div>
