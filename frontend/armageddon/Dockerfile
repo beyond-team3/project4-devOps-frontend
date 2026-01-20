@@ -17,6 +17,12 @@ FROM nginx:alpine
 # 빌드 단계에서 만든 결과물(dist 폴더)을 Nginx가 서비스할 경로로 복사
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# production stage
+FROM nginx:stable-alpine AS production-stage
+COPY --from=build-stage /app/dist /usr/share/nginx/html
+
+COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+
 # 80번 포트 노출
 EXPOSE 80
 
