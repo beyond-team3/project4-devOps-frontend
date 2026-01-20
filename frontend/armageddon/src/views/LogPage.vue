@@ -138,8 +138,7 @@ const sortedTransactions = computed(() => {
 
                 <span
                     v-if="txn.category"
-                    class="text-xs px-2 py-0.5 rounded"
-                    style="background-color: #E1E5AC; color: #000000"
+                    class="px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold"
                 >
               {{ txn.category }}
             </span>
