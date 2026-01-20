@@ -10,7 +10,7 @@ pipeline {
         // 노드 의존성 설치 및 빌드
         stage('Build Node.js') {
             steps {
-                dir('frontend') {
+                dir('frontend/armageddon') {
                     // Node.js가 젠킨스 서버에 설치되어 있어야 함
                     // 없다면 docker agent를 쓰는 방법도 있지만 일단 쉘로 진행
                     sh 'npm install'
@@ -22,7 +22,7 @@ pipeline {
         // 도커 이미지 빌드
         stage('Docker Build') {
             steps {
-                dir('frontend') {
+                dir('frontend/armageddon') {
                     // 플랫폼 명시 (Mac M1/M2 사용자를 위해 amd64 강제)
                     sh 'docker build --no-cache --platform linux/amd64 -t $IMAGE_NAME:latest .'
                 }
@@ -48,10 +48,10 @@ pipeline {
 
     post {
         success {
-            echo '🚀 프론트엔드 배포 완료! 사이트에서 확인해보세요.'
+            echo '프론트엔드 배포 완료! 사이트에서 확인해보세요.'
         }
         failure {
-            echo '💥 에러 발생! 도움!'
+            echo '에러 발생!'
         }
     }
 }
