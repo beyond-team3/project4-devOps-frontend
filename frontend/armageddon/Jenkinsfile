@@ -106,7 +106,7 @@ pipeline {
                     sh 'kubectl apply -f frontend/deployment.yml'
 
                     // Deployment 재시작 (이미지 업데이트 반영)
-                    sh 'kubectl rollout restart frontend-deployment'
+                    sh 'kubectl rollout restart deployment/frontend-deployment'
                 }
             }
         }
