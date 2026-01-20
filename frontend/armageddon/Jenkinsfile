@@ -33,18 +33,18 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-guntinue', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         dir('frontend/armageddon') {
                             if (isUnix()) {
-                                sh "docker build -t ${DOCKER_USER}/armageddon-front:${currentBuild.number} ."
-                                sh "docker build -t ${DOCKER_USER}/armageddon-front:latest ."
+                                sh "docker build -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
+                                sh "docker build -t ${DOCKER_USER}/armageddon-frontend:latest ."
                                 sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}"
-                                sh "docker push ${DOCKER_USER}/armageddon-front:${currentBuild.number}"
-                                sh "docker push ${DOCKER_USER}/armageddon-front:latest"
+                                sh "docker push ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}"
+                                sh "docker push ${DOCKER_USER}/armageddon-frontend:latest"
                                 sh "docker logout"
                             } else {
-                                bat "docker build -t ${DOCKER_USER}/armageddon-front:${currentBuild.number} ."
-                                bat "docker build -t ${DOCKER_USER}/armageddon-front:latest ."
+                                bat "docker build -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
+                                bat "docker build -t ${DOCKER_USER}/armageddon-frontend:latest ."
                                 bat "docker login -u %DOCKER_USER% -p %DOCKER_PASS%"
-                                bat "docker push ${DOCKER_USER}/armageddon-front:${currentBuild.number}"
-                                bat "docker push ${DOCKER_USER}/armageddon-front:latest"
+                                bat "docker push ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}"
+                                bat "docker push ${DOCKER_USER}/armageddon-frontend:latest"
                                 bat "docker logout"
                             }
                         }
@@ -72,7 +72,7 @@ pipeline {
 
                             // Deployment 이미지 태그 업데이트
                             sh """
-                                sed -i 's|image: .*|image: ${DOCKER_USER}/armageddon-front:${currentBuild.number}|g' deployment.yml
+                                sed -i 's|image: .*|image: ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}|g' deployment.yml
                             """
 
                             // 변경사항 커밋 및 푸시 (credential 사용)
