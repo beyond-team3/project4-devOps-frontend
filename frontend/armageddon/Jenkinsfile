@@ -47,11 +47,47 @@ pipeline {
     }
 
     post {
-        success {
-            echo '프론트엔드 배포 완료! 사이트에서 확인해보세요.'
-        }
-        failure {
-            echo '에러 발생!'
+            always {
+                script {
+                    if (isUnix()) {
+                        sh 'docker logout'
+                    } else {
+                        bat 'docker logout'
+                    }
+                }
+            }
+            success {
+                withCredentials([string(credentialsId: 'armageddon-discord', variable: 'DISCORD')]) {
+                    discordSend(
+                        description: """
+                        **백앤드 빌드 성공!** :tada:
+
+                        **제목**: ${currentBuild.displayName}
+                        **결과**: :white_check_mark: ${currentBuild.currentResult}
+                        **실행 시간**: ${currentBuild.duration / 1000}s
+                        **링크**: [빌드 결과 보기](${env.BUILD_URL})
+                        """,
+                        title: "${env.JOB_NAME} 백앤드 빌드 성공!",
+                        webhookURL: "$DISCORD"
+                    )
+                }
+            }
+            failure {
+                withCredentials([string(credentialsId: 'armageddon-discord', variable: 'DISCORD')]) {
+                    discordSend(
+                        description: """
+                        **백앤드 빌드 실패!** :x:
+
+                        **제목**: ${currentBuild.displayName}
+                        **결과**: :x: ${currentBuild.currentResult}
+                        **실행 시간**: ${currentBuild.duration / 1000}s
+                        **링크**: [빌드 결과 보기](${env.BUILD_URL})
+                        """,
+                        title: "${env.JOB_NAME} 백앤드 빌드 실패!",
+                        webhookURL: "$DISCORD"
+                    )
+                }
+            }
         }
     }
 }
