@@ -31,7 +31,16 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-guntinue', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+
+                        // 파일 구조 로그로 확인
+                        sh 'echo "===  현재 파일 구조 확인 ==="'
+                        sh 'find . -maxdepth 3 -not -path "*/node_modules/*"'
+
                         dir('frontend/armageddon') {
+                            // Dockerfile 존재여부 로그로 확인
+                            sh 'echo "=== 📍 현재 위치 파일 확인 ==="'
+                            sh 'ls -al'
+
                             if (isUnix()) {
                                 sh "docker build -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
                                 sh "docker build -t ${DOCKER_USER}/armageddon-frontend:latest ."
