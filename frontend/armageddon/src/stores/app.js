@@ -1,8 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { authApi, userApi, transactionApi, goalApi, getTokens, clearTokens } from '../api'
-
-const STORAGE_KEY = 'armageddon_data'
 
 export const useAppStore = defineStore('app', () => {
     // State

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { getGoalDetail } from '../../api/goal'
-import { Target, Wallet, X, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-vue-next'
+import { Target, Wallet, X, AlertTriangle } from 'lucide-vue-next'
 import { CATEGORY_META } from '../../constants/category'
 
 const props = defineProps({
