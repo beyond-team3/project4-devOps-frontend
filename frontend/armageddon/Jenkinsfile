@@ -1,0 +1,77 @@
+pipeline {
+    agent any
+
+    environment {
+        // DockerHub 및 Git 설정
+        DOCKER_REGISTRY = "guntinue/armageddon-frontend"
+        DOCKER_CREDENTIAL_ID = "DOCKERHUB_PASSWORD"  확인 필요
+        GIT_CREDENTIAL_ID = "guntinue-git-auth"
+        MANIFEST_REPO_URL = "https://github.com/beyond-team2/project4-devOps-manifests.git"
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir('frontend/armageddon') {
+                    script {
+                        echo "Building Docker Image..."
+                        sh "docker build -t ${DOCKER_REGISTRY}:${IMAGE_TAG} ."
+                        sh "docker build -t ${DOCKER_REGISTRY}:latest ."
+                    }
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    echo "Pushing Docker Image..."
+                    withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIAL_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                        sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
+                        sh "docker push ${DOCKER_REGISTRY}:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Update Manifest') {
+            steps {
+                script {
+                    echo "Updating Kubernetes Manifest..."
+                    withCredentials([usernamePassword(credentialsId: GIT_CREDENTIAL_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                        sh """
+                            rm -rf manifest-repo
+                            git clone ${MANIFEST_REPO_URL} manifest-repo
+                            cd manifest-repo
+                            
+                            # Deployment 파일 내 이미지 태그 업데이트
+                            # 운영체제(Linux/Mac)에 따른 sed 호환성 고려 (Jenkins는 보통 Linux)
+                            sed -i 's|image: ${DOCKER_REGISTRY}:.*|image: ${DOCKER_REGISTRY}:${IMAGE_TAG}|g' armageddon_manifests/frontend/deployment.yml
+                            
+                            git config user.email "jenkins@pipeline.com"
+                            git config user.name "Jenkins Pipeline"
+                            
+                            git add armageddon_manifests/frontend/deployment.yml
+                            
+                            if ! git diff-index --quiet HEAD; then
+                                git commit -m "Update frontend image tag to ${IMAGE_TAG}"
+                                # Credential을 포함한 URL로 푸시
+                                git push https://${GIT_USER}:${GIT_PASS}@github.com/beyond-team2/project4-devOps-manifests.git HEAD:main
+                            else
+                                echo "No changes to commit."
+                            fi
+                        """
+                    }
+                }
+            }
+        }
+    }
+}
