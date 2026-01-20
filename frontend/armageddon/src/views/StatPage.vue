@@ -24,7 +24,7 @@ const summaryData = ref({
   totalIncome: 0,
   totalExpense: 0,
   netProfit: 0,
-  avgExpense: 0,
+  averageExpense: 0,
 })
 
 const topExpenses = ref([])
@@ -53,7 +53,7 @@ const onPeriodChange = async ({ startDate, endDate }) => {
     if (startDate) params.startDate = startDate.toISOString().slice(0, 10)
     if (endDate) params.endDate = endDate.toISOString().slice(0, 10)
 
-    // 1️⃣ 요약 통계
+    //  요약 통계
     const summaryRes = await fetchSummaryStatistics(params)
     summaryData.value = {
       totalIncome: summaryRes.totalIncome,
@@ -62,15 +62,15 @@ const onPeriodChange = async ({ startDate, endDate }) => {
       avgExpense: summaryRes.averageExpense,
     }
 
-    // 2️⃣ 상위 지출
+    //  상위 지출
     const topRes = await fetchTopExpenses(params)
     topExpenses.value = topRes
 
-    // 3️⃣ 카테고리별 도넛
+    // 카테고리별 도넛
     const categoryRes = await fetchCategoryExpenseStatistics(params)
     categoryExpenses.value = categoryRes
 
-    // 4️⃣ 지출 추이
+    // 지출 추이
     const trendParams = { ...params, unit: trendUnit.value }
     const trendRes = await fetchExpenseTrend(trendParams)
     trendData.value = trendRes.data // { label, amount } 배열
@@ -90,45 +90,106 @@ const onPeriodChange = async ({ startDate, endDate }) => {
 </script>
 
 
+
 <template>
+  <!-- 기간 선택 -->
   <PeriodSelector @change="onPeriodChange" />
 
-  <div v-if="loading">로딩중...</div>
-  <div v-else-if="error">{{ error }}</div>
+  <!-- 상태 -->
+  <div v-if="loading" class="state">로딩중...</div>
+  <div v-else-if="error" class="state error">{{ error }}</div>
 
-  <template v-else>
+  <!-- 본문 -->
+  <div v-else class="stat-page">
+    <!-- 요약 카드 -->
     <SummaryCards
-        class="summary-cards"
+        class="summary"
         :totalIncome="summaryData.totalIncome"
         :totalExpense="summaryData.totalExpense"
         :netProfit="summaryData.netProfit"
         :avgExpense="summaryData.avgExpense"
     />
 
-    <div class="grid">
-      <TopExpenseList :expenses="topExpenses" />
-      <CategoryDonutChart :data="categoryExpenses" />
-    </div>
+    <!-- 하단 3분할 -->
+    <section class="detail-grid">
+      <!-- 상위 지출 -->
+      <div class="card top">
+        <TopExpenseList :expenses="topExpenses" />
+      </div>
 
-    <div class="expense-trend-wrapper">
-      <ExpenseTrendChart :data="trendData" :unit="trendUnit" />
-    </div>
-  </template>
+      <!-- 도넛 -->
+      <div class="card donut">
+        <CategoryDonutChart :data="categoryExpenses" />
+      </div>
+
+      <!-- 추이 그래프 -->
+      <div class="card trend">
+        <ExpenseTrendChart
+            :data="trendData"
+            :unit="trendUnit"
+        />
+      </div>
+    </section>
+  </div>
 </template>
 
+
 <style scoped>
-
-.expense-trend-wrapper{
-  margin: 10px;
-}
-
-.summary-cards {
-  margin: 10px;
-}
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.stat-page {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  margin: 10px;
+}
+
+/* ===== GRID ===== */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 16px;
+  align-items: stretch;
+}
+/* 왼쪽: 상위 지출 (2행) */
+.card.top {
+  grid-row: 1 / span 2;
+}
+
+/* 가운데: 도넛 (1행만) */
+.card.donut {
+  grid-row: 1;
+}
+
+/* 오른쪽: 추이 (2행) */
+.card.trend {
+  grid-row: 1 / span 2;
+  padding: 10px 14px 8px;
+}
+
+/* 공통 카드 */
+.card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px;
+  height: 430px;
+  overflow: hidden;
+}
+
+/* ===== 반응형 ===== */
+@media (max-width: 1200px) {
+  .detail-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .card.top,
+  .card.donut,
+  .card.trend {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -1,0 +1,155 @@
+pipeline {
+    agent any
+
+    environment {
+        // GitHub 저장소 URL
+        SOURCE_GITHUB_URL = 'https://github.com/beyond-team3/project4-devOps-frontend.git'
+        MANIFESTS_GITHUB_URL = 'https://github.com/beyond-team3/project4-devOps-manifests.git'
+
+        // Git 설정
+        GIT_USERNAME = 'guntinue'
+        GIT_EMAIL = 'rjssn93@gmail.com'
+    }
+
+    stages {
+        stage('Source Build') {
+            steps {
+                // 소스 코드 체크아웃
+                git branch: 'main',
+                    credentialsId: 'guntinue-git-auth',
+                    url: "${env.SOURCE_GITHUB_URL}"
+
+                // Node.js 빌드
+                dir('frontend/armageddon') {
+                    sh 'npm install'
+                    sh 'npm run build'
+                }
+            }
+        }
+
+        stage('Docker Build and Push') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-guntinue', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+
+                        // 파일 구조 로그로 확인
+                        sh 'echo "===  현재 파일 구조 확인 ==="'
+                        sh 'find . -maxdepth 3 -not -path "*/node_modules/*"'
+
+                        dir('frontend/armageddon') {
+                            // Dockerfile 존재여부 로그로 확인
+                            sh 'echo "=== 📍 현재 위치 파일 확인 ==="'
+                            sh 'ls -al'
+
+                            if (isUnix()) {
+                                sh "docker build -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
+                                sh "docker build -t ${DOCKER_USER}/armageddon-frontend:latest ."
+                                sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}"
+                                sh "docker push ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}"
+                                sh "docker push ${DOCKER_USER}/armageddon-frontend:latest"
+                                sh "docker logout"
+                            } else {
+                                bat "docker build -t ${DOCKER_USER}/armageddon-frontend:${currentBuild.number} ."
+                                bat "docker build -t ${DOCKER_USER}/armageddon-frontend:latest ."
+                                bat "docker login -u %DOCKER_USER% -p %DOCKER_PASS%"
+                                bat "docker push ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}"
+                                bat "docker push ${DOCKER_USER}/armageddon-frontend:latest"
+                                bat "docker logout"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('K8S Manifest Update') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: 'DOCKERHUB_PASSWORD', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS'),
+                        usernamePassword(credentialsId: 'guntinue-git-auth', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')
+                    ]) {
+                        // Kubernetes 매니페스트 저장소 체크아웃
+                        dir('frontend') {
+                            git branch: 'main',
+                            credentialsId: 'guntinue-git-auth',
+                            url: "${env.MANIFESTS_GITHUB_URL}"
+
+                            // Git 사용자 설정
+                            sh "git config user.name '${env.GIT_USERNAME}'"
+                            sh "git config user.email '${env.GIT_EMAIL}'"
+
+                            // Deployment 이미지 태그 업데이트
+                            sh """
+                                sed -i 's|image: .*|image: ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}|g' deployment.yml
+                            """
+
+                            // 변경사항 커밋 및 푸시 (credential 사용)
+                            sh """
+                                git add .
+                                git commit -m 'Update frontend image to ${currentBuild.number}' || echo 'No changes to commit'
+                                git push https://${GIT_USER}:${GIT_TOKEN}@github.com:beyond-team3/project4-devOps-manifests.git main
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                dir('frontend') {
+                    // ConfigMap, Deployment, Service 적용
+                    sh 'kubectl apply -f deployment.yml'
+
+                    // Deployment 재시작 (이미지 업데이트 반영)
+                    sh 'kubectl rollout restart frontend-deployment'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                if (isUnix()) {
+                    sh 'docker logout || true'
+                } else {
+                    bat 'docker logout || true'
+                }
+            }
+        }
+        success {
+            withCredentials([string(credentialsId: 'armageddon-discord', variable: 'DISCORD')]) {
+                discordSend(
+                    description: """
+                    **빌드 성공!** :tada:
+
+                    **제목**: ${currentBuild.displayName}
+                    **결과**: :white_check_mark: ${currentBuild.currentResult}
+                    **실행 시간**: ${currentBuild.duration / 1000}s
+                    **링크**: [빌드 결과 보기](${env.BUILD_URL})
+                    """,
+                    title: "${env.JOB_NAME} 빌드 성공!",
+                    webhookURL: "$DISCORD"
+                )
+            }
+        }
+        failure {
+            withCredentials([string(credentialsId: 'armageddon-discord', variable: 'DISCORD')]) {
+                discordSend(
+                    description: """
+                    **빌드 실패!** :x:
+
+                    **제목**: ${currentBuild.displayName}
+                    **결과**: :x: ${currentBuild.currentResult}
+                    **실행 시간**: ${currentBuild.duration / 1000}s
+                    **링크**: [빌드 결과 보기](${env.BUILD_URL})
+                    """,
+                    title: "${env.JOB_NAME} 빌드 실패!",
+                    webhookURL: "$DISCORD"
+                )
+            }
+        }
+    }
+}

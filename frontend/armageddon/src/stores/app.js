@@ -1,8 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { authApi, userApi, transactionApi, goalApi, getTokens, clearTokens } from '../api'
-
-const STORAGE_KEY = 'armageddon_data'
 
 export const useAppStore = defineStore('app', () => {
     // State
@@ -538,33 +536,19 @@ export const useAppStore = defineStore('app', () => {
             const res = await goalApi.getGoals()
             if (res.result === 'SUCCESS') {
                 goals.value = res.data.map(g => {
-                    // Map backend fields to frontend model
-                    const type = g.goalType === 'SAVING' ? 'savings' : 'spending'
-                    const isSavings = type === 'savings'
-
-                    // Calculate derived fields if missing in summary
-                    const currentAmount = g.targetAmount * (g.progressRate / 100)
-
                     return {
+                        ...g, // 백엔드 데이터 그대로 사용 (goalId, goalType, status, statusMessage, currentAmount 등)
+
+                        // Frontend legacy field compatibility (if needed)
                         id: g.goalId,
-                        type: type,
-                        title: g.title,
-                        status: mapStatus(g.status), // Helper needed or inline
-                        // Savings fields
-                        targetAmount: g.targetAmount,
-                        currentAmount: currentAmount,
-                        progressRate: g.progressRate,
-                        progress: g.progressRate, // Frontend uses both?
-                        // Spending fields
+                        type: g.goalType === 'SAVING' ? 'savings' : 'spending', // Legacy support
                         category: g.category || '기타',
-                        budgetLimit: g.targetAmount,
-                        spentAmount: currentAmount,
-                        usageRate: g.progressRate,
-                        remaining: g.targetAmount - currentAmount,
-                        // Common
-                        startDate: g.startDate,
-                        endDate: g.endDate,
-                        rawStatus: g.status
+
+                        // Remaining budget calculation (if not in backend)
+                        remaining: g.targetAmount - g.currentAmount,
+
+                        // status is already correct from backend (ACTIVE, COMPLETED, etc.)
+                        // we can use g.status directly.
                     }
                 })
             }

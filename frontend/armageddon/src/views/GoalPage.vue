@@ -18,19 +18,36 @@ const activeTab = ref('active') // 'active' or 'finished'
 
 const goalStats = computed(() => store.goals)
 
-const activeGoals = computed(() => goalStats.value
-  .filter(g => !['COMPLETED', 'FAILED'].includes(g.rawStatus))
-  .sort((a, b) => {
-    // Savings first
-    if (a.type === 'savings' && b.type !== 'savings') return -1
-    if (a.type !== 'savings' && b.type === 'savings') return 1
-    return 0
-  })
+const isFinished = (goal) => {
+  const end = new Date(goal.endDate)
+  const today = new Date()
+
+  // 시간 제거 (날짜 단위 비교)
+  end.setHours(23, 59, 59, 999)
+  today.setHours(0, 0, 0, 0)
+
+  return end < today
+}
+
+const activeGoals = computed(() =>
+    goalStats.value
+        .filter(g =>
+            g.status === 'ACTIVE' ||
+            (g.status === 'EXCEEDED' && !isFinished(g))
+        )
+        .sort((a, b) => {
+          if (a.type === 'savings' && b.type !== 'savings') return -1
+          if (a.type !== 'savings' && b.type === 'savings') return 1
+          return 0
+        })
 )
 
-const finishedGoals = computed(() => goalStats.value.filter(g => 
-    ['COMPLETED', 'FAILED'].includes(g.rawStatus)
-))
+const finishedGoals = computed(() =>
+    goalStats.value.filter(g =>
+        isFinished(g) ||
+        ['COMPLETED', 'FAILED', 'SUCCESS'].includes(g.status)
+    )
+)
 
 const handleAddClick = () => {
   selectedGoal.value = null
@@ -53,8 +70,8 @@ const handleFormSubmit = async (payload) => {
     if (payload.type === 'savings') {
         // 저축 목표 중복 체크
         // If editing, exclude self.
-        const duplicate = activeGoals.value.find(g => 
-            g.type === 'savings' && 
+        const duplicate = activeGoals.value.find(g =>
+            g.type === 'savings' &&
             (!selectedGoal.value || g.id !== selectedGoal.value.id)
         )
         if (duplicate) {
@@ -66,16 +83,16 @@ const handleFormSubmit = async (payload) => {
         const duplicate = activeGoals.value.find(g => {
             if (g.type !== 'spending') return false
             if (selectedGoal.value && g.id === selectedGoal.value.id) return false
-            
+
             // Category Matching
             const goalCat = g.category
             const payloadCat = payload.category
 
             if (goalCat === payloadCat) return true
-            
+
             return false
         })
-        
+
         if (duplicate) {
              toast.error('해당 카테고리에 이미 진행 중인 지출 목표가 있습니다.')
              return
@@ -106,7 +123,6 @@ const handleDeleteConfirm = async () => {
     await store.deleteGoal(deleteConfirmId.value)
     toast.success('목표가 삭제되었습니다.')
     deleteConfirmId.value = null
-    deleteConfirmId.value = null
   }
 }
 
@@ -117,6 +133,7 @@ const handleDetailClick = (id) => {
 onMounted(() => {
   store.fetchGoals()
 })
+
 </script>
 
 <template>
@@ -180,8 +197,8 @@ onMounted(() => {
     />
 
     <GoalDetailModal
-      :is-open="!!detailGoalId"
-      :goal-id="detailGoalId"
+      :isOpen="!!detailGoalId"
+      :goalId="detailGoalId"
       @close="detailGoalId = null"
     />
   </div>
