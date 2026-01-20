@@ -88,8 +88,8 @@ pipeline {
                 dir('k8s-manifests') {
                     // ConfigMap, Deployment, Service 적용
                     sh 'kubectl apply -f frontend-config.yml'
-                    sh 'kubectl apply -f test-frontend-dep.yml'
-                    sh 'kubectl apply -f test-frontend-ser.yml'
+                    sh 'kubectl apply -f armageddon-frontend-dep.yml'
+                    sh 'kubectl apply -f armageddon-frontend-ser.yml'
 
                     // Deployment 재시작 (이미지 업데이트 반영)
                     sh 'kubectl rollout restart deployment/frontend-deployment'
