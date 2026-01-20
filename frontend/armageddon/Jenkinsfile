@@ -75,13 +75,16 @@ pipeline {
                             credentialsId: 'guntinue-git-auth',
                             url: "${env.MANIFESTS_GITHUB_URL}"
 
+                            sh 'echo "=== 📂 파일 목록 확인 ==="'
+                            sh 'ls -al'
+
                             // Git 사용자 설정
                             sh "git config user.name '${env.GIT_USERNAME}'"
                             sh "git config user.email '${env.GIT_EMAIL}'"
 
                             // Deployment 이미지 태그 업데이트
                             sh """
-                                sed -i 's|image: .*|image: ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}|g' deployment.yml
+                                sed -i '' 's|image: .*|image: ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}|g' deployment.yml
                             """
 
                             // 변경사항 커밋 및 푸시 (credential 사용)
