@@ -16,12 +16,14 @@ pipeline {
             steps {
                 // 소스 코드 체크아웃
                 git branch: 'main',
-                credentialsId: 'guntinue-git-auth',
-                url: "${env.SOURCE_GITHUB_URL}"
+                    credentialsId: 'guntinue-git-auth',
+                    url: "${env.SOURCE_GITHUB_URL}"
 
                 // Node.js 빌드
-                sh 'npm install'
-                sh 'npm run build'
+                dir('frontend/armageddon') {
+                    sh 'npm install'
+                    sh 'npm run build'
+                }
             }
         }
 
@@ -29,20 +31,22 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-guntinue', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        if (isUnix()) {
-                            sh "docker build -t ${DOCKER_USER}/armageddon-front:${currentBuild.number} ."
-                            sh "docker build -t ${DOCKER_USER}/armageddon-front:latest ."
-                            sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}"
-                            sh "docker push ${DOCKER_USER}/armageddon-front:${currentBuild.number}"
-                            sh "docker push ${DOCKER_USER}/armageddon-front:latest"
-                            sh "docker logout"
-                        } else {
-                            bat "docker build -t ${DOCKER_USER}/armageddon-front:${currentBuild.number} ."
-                            bat "docker build -t ${DOCKER_USER}/armageddon-front:latest ."
-                            bat "docker login -u %DOCKER_USER% -p %DOCKER_PASS%"
-                            bat "docker push ${DOCKER_USER}/armageddon-front:${currentBuild.number}"
-                            bat "docker push ${DOCKER_USER}/armageddon-front:latest"
-                            bat "docker logout"
+                        dir('frontend/armageddon') {
+                            if (isUnix()) {
+                                sh "docker build -t ${DOCKER_USER}/armageddon-front:${currentBuild.number} ."
+                                sh "docker build -t ${DOCKER_USER}/armageddon-front:latest ."
+                                sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}"
+                                sh "docker push ${DOCKER_USER}/armageddon-front:${currentBuild.number}"
+                                sh "docker push ${DOCKER_USER}/armageddon-front:latest"
+                                sh "docker logout"
+                            } else {
+                                bat "docker build -t ${DOCKER_USER}/armageddon-front:${currentBuild.number} ."
+                                bat "docker build -t ${DOCKER_USER}/armageddon-front:latest ."
+                                bat "docker login -u %DOCKER_USER% -p %DOCKER_PASS%"
+                                bat "docker push ${DOCKER_USER}/armageddon-front:${currentBuild.number}"
+                                bat "docker push ${DOCKER_USER}/armageddon-front:latest"
+                                bat "docker logout"
+                            }
                         }
                     }
                 }
