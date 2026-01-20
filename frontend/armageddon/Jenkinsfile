@@ -81,7 +81,7 @@ pipeline {
 
                             // Deployment 이미지 태그 업데이트
                             sh """
-                                sed -i 's|image: .*|image: ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}|g' deployment.yml
+                                sed -i '' 's|image: .*|image: ${DOCKER_USER}/armageddon-frontend:${currentBuild.number}|g' deployment.yml
                             """
 
                             // 변경사항 커밋 및 푸시 (credential 사용)
