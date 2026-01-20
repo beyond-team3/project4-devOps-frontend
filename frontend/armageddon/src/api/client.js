@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // API 기본 설정
 // http://armageddon.local/api/auth/login << 요청 전송을 위한 변경
-const API_BASE_URL = 'http://localhost:8080/';
+const API_BASE_URL = '';
 
 // 토큰 관리
 const TOKEN_KEY = 'armageddon_tokens'
