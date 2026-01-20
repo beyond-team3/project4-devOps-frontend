@@ -15,14 +15,13 @@ RUN npm run build
 FROM nginx:stable-alpine AS production-stage
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-# 빌드할 때 파일 목록과 내용을 강제로 출력.
-RUN echo "=== [DEBUG] Check nginx folder ===" && \
-    ls -al ./nginx && \
-    echo "=== [DEBUG] Check config content ===" && \
-    cat ./nginx/default.conf
-
 # 설정 파일 복사
 COPY ./nginx/default.conf /etc/nginx/conf.d/default.conf
+
+# 빌드할 때 파일 목록과 내용을 강제로 출력.
+RUN echo "=== [DEBUG] Check Config File Content ===" && \
+    ls -al /etc/nginx/conf.d/ && \
+    cat /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
