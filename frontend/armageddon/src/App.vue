@@ -35,7 +35,7 @@ const isActive = (name) => currentRouteName.value === name
           class="text-2xl font-semibold"
           style="color: #000000"
         >
-          Armageddon
+          Armageddon .v1
         </router-link>
         <nav class="flex items-center gap-2">
           <router-link
