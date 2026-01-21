@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 // API 서버 주소
-const API_BASE_URL = 'http://armageddon.local';
+const API_BASE_URL = 'http://192.168.0.27:8080';
 
 // 토큰 관리
 const TOKEN_KEY = 'armageddon_tokens'
