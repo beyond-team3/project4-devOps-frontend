@@ -1,8 +1,16 @@
 import axios from 'axios'
 
 // API 서버 주소
-const API_BASE_URL = 'http://192.168.0.27:8080';
+const hostname = window.location.hostname;
+const protocol = window.location.protocol; // http: 또는 https:
 
+// 백엔드 포트는 8080으로 고정
+const BACKEND_PORT = '8080';
+
+// 최종 API 주소 조합
+const API_BASE_URL = `${protocol}//${hostname}:${BACKEND_PORT}`;
+
+console.log("현재 API 주소:", API_BASE_URL); // 콘솔에서 확인 가능
 // 토큰 관리
 const TOKEN_KEY = 'armageddon_tokens'
 
